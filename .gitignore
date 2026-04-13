@@ -1,0 +1,14 @@
+# Ignore everything
+*
+
+# Except directories, so we can traverse into them to find non-ignored files
+!*/
+
+# Except any directories named 'frontend', 'Frontend', or ending in 'frontend' (like flockchain-frontend)
+!*frontend*/
+!*frontend*/**
+!*Frontend*/
+!*Frontend*/**
+
+# Also keep .gitignore to track it
+!.gitignore
