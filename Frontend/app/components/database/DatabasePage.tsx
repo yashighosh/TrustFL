@@ -2,106 +2,77 @@
 
 import { useState, useRef } from "react";
 import { useToast } from "@/app/context/ToastContext";
+import { useHospital } from "@/app/context/HospitalContext";
 
 /* ──────── Types ──────── */
-interface Hospital {
+interface Doctor {
   id: string;
   name: string;
-  location: string;
-  type: string;
+  specialization: string;
+  experience: number;
+  phone: string;
+  status: "Active" | "On Leave";
 }
 
 interface Patient {
   id: string;
   name: string;
+  age: number;
   gender: string;
   blood: string;
-  hospital: string;
+  phone: string;
+  registeredAt: string;
+}
+
+interface Medicine {
+  id: string;
+  name: string;
+  category: string;
+  manufacturer: string;
+  stock: number;
+  unit: string;
 }
 
 interface MedRecord {
   id: string;
-  patient: string;
+  patientName: string;
+  doctorName: string;
   diagnosis: string;
-  doctor: string;
+  symptoms: string;
+  medication: string;
+  dosage: string;
+  date: string;
 }
 
-interface MLUpdate {
-  id: string;
-  hospital: string;
-  round: string;
-  accuracy: string;
-  hash: string;
-}
-
-/* ──────── Initial Data ──────── */
-const initialHospitals: Hospital[] = [
-  { id: "H001", name: "CityCare Hospital", location: "Chennai", type: "Private" },
-  { id: "H002", name: "Green Valley Hospital", location: "Bangalore", type: "Private" },
-  { id: "H003", name: "National Medical Center", location: "Delhi", type: "Government" },
+/* ──────── Initial Data (Demo) ──────── */
+const seedDoctors: Doctor[] = [
+  { id: "D001", name: "Dr. Arjun Mehta", specialization: "Cardiology", experience: 10, phone: "+91-9800011111", status: "Active" },
+  { id: "D002", name: "Dr. Priya Sharma", specialization: "Endocrinology", experience: 8, phone: "+91-9800022222", status: "Active" },
+  { id: "D003", name: "Dr. Rahul Verma", specialization: "General Medicine", experience: 12, phone: "+91-9800033333", status: "On Leave" },
 ];
 
-const initialPatients: Patient[] = [
-  { id: "P001", name: "Rohan Das", gender: "Male", blood: "B+", hospital: "H001" },
-  { id: "P002", name: "Ananya Sen", gender: "Female", blood: "O+", hospital: "H001" },
-  { id: "P003", name: "Karan Patel", gender: "Male", blood: "A+", hospital: "H002" },
-  { id: "P004", name: "Meera Nair", gender: "Female", blood: "AB+", hospital: "H003" },
+const seedPatients: Patient[] = [
+  { id: "P001", name: "Rohan Das", age: 36, gender: "Male", blood: "B+", phone: "+91-9876543210", registeredAt: "2026-01-15" },
+  { id: "P002", name: "Ananya Sen", age: 28, gender: "Female", blood: "O+", phone: "+91-9123456789", registeredAt: "2026-02-10" },
+  { id: "P003", name: "Karan Patel", age: 45, gender: "Male", blood: "A+", phone: "+91-9998887776", registeredAt: "2026-02-22" },
+  { id: "P004", name: "Meera Nair", age: 32, gender: "Female", blood: "AB+", phone: "+91-9555444333", registeredAt: "2026-03-01" },
 ];
 
-const initialRecords: MedRecord[] = [
-  { id: "R001", patient: "Rohan Das", diagnosis: "Hypertension", doctor: "Dr. Arjun Mehta" },
-  { id: "R002", patient: "Ananya Sen", diagnosis: "Type 2 Diabetes", doctor: "Dr. Priya Sharma" },
-  { id: "R003", patient: "Karan Patel", diagnosis: "Viral Fever", doctor: "Dr. Rahul Verma" },
-  { id: "R004", patient: "Meera Nair", diagnosis: "Migraine", doctor: "Dr. Neha Kapoor" },
+const seedMedicines: Medicine[] = [
+  { id: "M001", name: "Amlodipine", category: "Antihypertensive", manufacturer: "Cipla", stock: 500, unit: "5mg tablets" },
+  { id: "M002", name: "Metformin", category: "Antidiabetic", manufacturer: "Sun Pharma", stock: 350, unit: "500mg tablets" },
+  { id: "M003", name: "Paracetamol", category: "Analgesic", manufacturer: "GSK", stock: 1200, unit: "650mg tablets" },
+  { id: "M004", name: "Atorvastatin", category: "Statin", manufacturer: "Ranbaxy", stock: 200, unit: "10mg tablets" },
 ];
 
-const initialUpdates: MLUpdate[] = [
-  { id: "U001", hospital: "H001", round: "TR001", accuracy: "89%", hash: "hash_abc123" },
-  { id: "U002", hospital: "H002", round: "TR001", accuracy: "87%", hash: "hash_def456" },
-  { id: "U003", hospital: "H003", round: "TR002", accuracy: "91%", hash: "hash_xyz789" },
+const seedRecords: MedRecord[] = [
+  { id: "R001", patientName: "Rohan Das", doctorName: "Dr. Arjun Mehta", diagnosis: "Hypertension", symptoms: "Headache, dizziness", medication: "Amlodipine", dosage: "5mg daily", date: "2026-03-10" },
+  { id: "R002", patientName: "Ananya Sen", doctorName: "Dr. Priya Sharma", diagnosis: "Type 2 Diabetes", symptoms: "Fatigue, thirst", medication: "Metformin", dosage: "500mg twice daily", date: "2026-03-12" },
+  { id: "R003", patientName: "Karan Patel", doctorName: "Dr. Rahul Verma", diagnosis: "Viral Fever", symptoms: "High temp, body pain", medication: "Paracetamol", dosage: "650mg thrice daily", date: "2026-03-18" },
+  { id: "R004", patientName: "Meera Nair", doctorName: "Dr. Arjun Mehta", diagnosis: "Migraine", symptoms: "Severe headache, nausea", medication: "Sumatriptan", dosage: "50mg as needed", date: "2026-03-25" },
 ];
 
-const presets = [
-  `SELECT mr.diagnosis,\n  COUNT(*) as cases,\n  COUNT(DISTINCT p.hospital_id) as hospitals,\n  AVG(EXTRACT(YEAR FROM AGE(p.date_of_birth))) as avg_age\nFROM medical_record mr\nJOIN patient p ON mr.patient_id = p.patient_id\nGROUP BY mr.diagnosis\nHAVING COUNT(*) > 1\nORDER BY cases DESC;`,
-  `SELECT h.hospital_name,\n  COUNT(mu.update_id) as updates,\n  AVG(mu.accuracy)*100 as avg_acc,\n  AVG(cs.reputation_score) as reputation\nFROM hospital h\nJOIN model_update mu ON h.hospital_id = mu.hospital_id\nJOIN contribution_score cs ON h.hospital_id = cs.hospital_id\nGROUP BY h.hospital_name\nORDER BY avg_acc DESC;`,
-];
-
-const fakeResults = [
-  { headers: ["diagnosis", "cases", "hospitals", "avg_age"], rows: [["Hypertension", "7", "3", "58.7"], ["Type 2 Diabetes", "8", "3", "52.3"], ["Migraine", "4", "2", "34.2"]] },
-  { headers: ["hospital", "updates", "avg_acc", "reputation"], rows: [["Metro General", "4", "91.2%", "0.85"], ["CityCare Hospital", "4", "89.3%", "0.80"], ["Green Valley", "4", "87.1%", "0.75"]] },
-  { headers: ["hospital", "patients", "avg_accuracy"], rows: [["Metro General", "1102", "91.0%"], ["CityCare Hospital", "847", "89.0%"], ["Green Valley", "623", "87.0%"]] },
-];
-
-/* ──────── Inner Tab Component ──────── */
-function InnerTabs({
-  tabs,
-  activeTab,
-  onTabChange,
-}: {
-  tabs: string[];
-  activeTab: number;
-  onTabChange: (i: number) => void;
-}) {
-  return (
-    <div className="flex" style={{ borderBottom: "none", gap: 0 }}>
-      {tabs.map((label, i) => (
-        <button
-          key={i}
-          onClick={() => onTabChange(i)}
-          className={`px-5 py-3 font-mono text-[11px] cursor-pointer uppercase tracking-wider transition-all duration-200 bg-transparent border-t-0 border-l-0 border-r-0 border-b-2 ${
-            activeTab === i
-              ? "text-primary border-b-primary"
-              : "text-muted border-b-transparent hover:text-text-primary"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/* ──────── Badge Component ──────── */
+/* ──────── Badge ──────── */
 function Badge({ children, variant }: { children: React.ReactNode; variant: "green" | "cyan" | "amber" | "coral" | "blue" }) {
   const styles: Record<string, string> = {
     green: "bg-green-light text-neon-green border border-neon-green/20",
@@ -117,148 +88,119 @@ function Badge({ children, variant }: { children: React.ReactNode; variant: "gre
   );
 }
 
-/* ──────── Schema Visual ──────── */
-function SchemaVisual() {
-  return (
-    <div className="relative h-[420px]">
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 420 420" preserveAspectRatio="none">
-        <line x1="160" y1="55" x2="75" y2="120" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="200" y1="60" x2="210" y2="120" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="240" y1="55" x2="340" y2="120" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="195" y1="160" x2="155" y2="235" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="350" y1="160" x2="280" y2="235" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="155" y1="270" x2="195" y2="355" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="355" y1="265" x2="270" y2="355" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-        <line x1="255" y1="370" x2="330" y2="370" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 3" />
-      </svg>
+/* ──────── SQL Presets ──────── */
+const presets = [
+  { label: "Patient Stats", query: `SELECT p.patient_name, p.blood_group,\n  COUNT(mr.record_id) as total_visits,\n  MAX(mr.visit_date) as last_visit\nFROM patient p\nLEFT JOIN medical_record mr\n  ON p.patient_id = mr.patient_id\nWHERE p.hospital_id = 'H001'\nGROUP BY p.patient_name, p.blood_group\nORDER BY total_visits DESC;` },
+  { label: "Doctor Workload", query: `SELECT d.doctor_name, d.specialization,\n  COUNT(DISTINCT mr.patient_id) as patients,\n  COUNT(mr.record_id) as total_records\nFROM doctor d\nLEFT JOIN medical_record mr\n  ON d.doctor_id = mr.doctor_id\nGROUP BY d.doctor_name, d.specialization\nORDER BY patients DESC;` },
+  { label: "Medicine Usage", query: `SELECT m.medicine_name, m.category,\n  COUNT(mr.record_id) as prescriptions,\n  m.stock_quantity as remaining_stock\nFROM medicine m\nLEFT JOIN medical_record mr\n  ON mr.medication LIKE '%' || m.medicine_name || '%'\nGROUP BY m.medicine_name, m.category, m.stock_quantity\nORDER BY prescriptions DESC;` },
+  { label: "Diagnosis Report", query: `SELECT mr.diagnosis,\n  COUNT(*) as total_cases,\n  COUNT(DISTINCT mr.patient_id) as unique_patients,\n  COUNT(DISTINCT mr.doctor_id) as doctors_involved\nFROM medical_record mr\nWHERE mr.hospital_id = 'H001'\nGROUP BY mr.diagnosis\nHAVING COUNT(*) >= 1\nORDER BY total_cases DESC;` },
+];
 
-      <div className="schema-node n-hospital">
-        <div className="font-bold text-xs mb-1.5 text-primary">Hospital</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> hospital_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">hospital_name</div>
-        <div className="text-muted text-[10px] leading-[1.8]">hospital_type</div>
-      </div>
+const fakeResults = [
+  { headers: ["patient", "blood_group", "visits", "last_visit"], rows: [["Rohan Das", "B+", "3", "2026-03-10"], ["Ananya Sen", "O+", "2", "2026-03-12"], ["Karan Patel", "A+", "1", "2026-03-18"], ["Meera Nair", "AB+", "1", "2026-03-25"]] },
+  { headers: ["doctor", "specialization", "patients", "records"], rows: [["Dr. Arjun Mehta", "Cardiology", "2", "2"], ["Dr. Priya Sharma", "Endocrinology", "1", "1"], ["Dr. Rahul Verma", "General Med", "1", "1"]] },
+  { headers: ["medicine", "category", "prescriptions", "stock"], rows: [["Amlodipine", "Antihypertensive", "1", "500"], ["Metformin", "Antidiabetic", "1", "350"], ["Paracetamol", "Analgesic", "1", "1200"]] },
+  { headers: ["diagnosis", "cases", "patients", "doctors"], rows: [["Hypertension", "3", "2", "1"], ["Type 2 Diabetes", "2", "2", "1"], ["Migraine", "2", "1", "1"], ["Viral Fever", "1", "1", "1"]] },
+];
 
-      <div className="schema-node n-doctor">
-        <div className="font-bold text-xs mb-1.5">Doctor</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> doctor_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-amber">FK</span> hospital_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">specialization</div>
-      </div>
-
-      <div className="schema-node n-patient">
-        <div className="font-bold text-xs mb-1.5">Patient</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> patient_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-amber">FK</span> hospital_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">blood_group</div>
-      </div>
-
-      <div className="schema-node n-contrib">
-        <div className="font-bold text-xs mb-1.5 text-amber">Contribution</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> contrib_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-amber">FK</span> hospital_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">reputation_score</div>
-      </div>
-
-      <div className="schema-node n-medrec">
-        <div className="font-bold text-xs mb-1.5">Medical_Record</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> record_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">diagnosis</div>
-        <div className="text-muted text-[10px] leading-[1.8]">symptoms</div>
-      </div>
-
-      <div className="schema-node n-mlmodel">
-        <div className="font-bold text-xs mb-1.5 text-neon-green">ML_Model</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> model_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">algorithm_type</div>
-        <div className="text-muted text-[10px] leading-[1.8]">model_version</div>
-      </div>
-
-      <div className="schema-node n-update">
-        <div className="font-bold text-xs mb-1.5 text-amber">Model_Update</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> update_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">model_hash</div>
-        <div className="text-muted text-[10px] leading-[1.8]">accuracy / loss</div>
-      </div>
-
-      <div className="schema-node n-blockchain">
-        <div className="font-bold text-xs mb-1.5 text-coral">Blockchain</div>
-        <div className="text-muted text-[10px] leading-[1.8]"><span className="text-cyan">PK</span> verify_id</div>
-        <div className="text-muted text-[10px] leading-[1.8]">tx_hash</div>
-        <div className="text-muted text-[10px] leading-[1.8]">block_number</div>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════ MAIN DATABASE PAGE ══════════════════════════ */
+/* ══════════════════════════ DATABASE PAGE ══════════════════════════ */
 export default function DatabasePage() {
   const { showToast } = useToast();
+  const { hospital } = useHospital();
 
-  const [hospitals, setHospitals] = useState<Hospital[]>(initialHospitals);
-  const [patients, setPatients] = useState<Patient[]>(initialPatients);
-  const [records, setRecords] = useState<MedRecord[]>(initialRecords);
-  const [updates] = useState<MLUpdate[]>(initialUpdates);
+  const [doctors, setDoctors] = useState<Doctor[]>(seedDoctors);
+  const [patients, setPatients] = useState<Patient[]>(seedPatients);
+  const [medicines, setMedicines] = useState<Medicine[]>(seedMedicines);
+  const [records, setRecords] = useState<MedRecord[]>(seedRecords);
 
-  const [formTab, setFormTab] = useState(0);
-  const [tableTab, setTableTab] = useState(0);
+  const [activeSection, setActiveSection] = useState<"overview" | "doctors" | "patients" | "medicines" | "records" | "sql">("overview");
 
-  // Form refs
-  const hNameRef = useRef<HTMLInputElement>(null);
-  const hLocRef = useRef<HTMLInputElement>(null);
-  const hTypeRef = useRef<HTMLSelectElement>(null);
-  const hEmailRef = useRef<HTMLInputElement>(null);
-  const pNameRef = useRef<HTMLInputElement>(null);
-  const pGenderRef = useRef<HTMLSelectElement>(null);
-  const pBloodRef = useRef<HTMLSelectElement>(null);
-  const pHospRef = useRef<HTMLSelectElement>(null);
-  const rPatientRef = useRef<HTMLSelectElement>(null);
-  const rDiagRef = useRef<HTMLInputElement>(null);
-  const rSympRef = useRef<HTMLInputElement>(null);
-  const rMedsRef = useRef<HTMLInputElement>(null);
+  /* ── Form states (Doctor) ── */
+  const [dName, setDName] = useState("");
+  const [dSpec, setDSpec] = useState("Cardiology");
+  const [dExp, setDExp] = useState("");
+  const [dPhone, setDPhone] = useState("");
 
-  const [sqlQuery, setSqlQuery] = useState(
-    `SELECT h.hospital_name, COUNT(p.patient_id) as patients,\nAVG(mu.accuracy)*100 as avg_accuracy\nFROM hospital h\nLEFT JOIN patient p ON h.hospital_id = p.hospital_id\nLEFT JOIN model_update mu ON h.hospital_id = mu.hospital_id\nGROUP BY h.hospital_name\nORDER BY avg_accuracy DESC;`
-  );
+  /* ── Form states (Patient) ── */
+  const [pName, setPName] = useState("");
+  const [pAge, setPAge] = useState("");
+  const [pGender, setPGender] = useState("Male");
+  const [pBlood, setPBlood] = useState("A+");
+  const [pPhone, setPPhone] = useState("");
+
+  /* ── Form states (Medicine) ── */
+  const [mName, setMName] = useState("");
+  const [mCategory, setMCategory] = useState("");
+  const [mManuf, setMManuf] = useState("");
+  const [mStock, setMStock] = useState("");
+  const [mUnit, setMUnit] = useState("");
+
+  /* ── Form states (Record) ── */
+  const [rPatient, setRPatient] = useState("");
+  const [rDoctor, setRDoctor] = useState("");
+  const [rDiag, setRDiag] = useState("");
+  const [rSymp, setRSymp] = useState("");
+  const [rMed, setRMed] = useState("");
+  const [rDose, setRDose] = useState("");
+
+  /* ── SQL ── */
+  const [sqlQuery, setSqlQuery] = useState(presets[0].query);
   const [queryResult, setQueryResult] = useState<{ headers: string[]; rows: string[][] } | null>(null);
   const [queryRunning, setQueryRunning] = useState(false);
 
+  const inputClass = "w-full bg-surface-2 border border-border-2 rounded-lg px-3.5 py-2.5 text-text-primary font-sans text-sm outline-none transition-colors focus:border-cyan-2 focus:shadow-[0_0_0_3px_var(--color-cyan-dim)] placeholder:text-muted-2";
+
   /* ── Actions ── */
-  function registerHospital() {
-    const name = hNameRef.current?.value.trim();
-    if (!name) { showToast("Error", "Hospital name required", "var(--color-coral)"); return; }
-    const loc = hLocRef.current?.value || "Unknown";
-    const type = hTypeRef.current?.value || "Private";
-    const id = `H00${hospitals.length + 1}`;
-    setHospitals((prev) => [...prev, { id, name, location: loc, type }]);
-    if (hNameRef.current) hNameRef.current.value = "";
-    if (hLocRef.current) hLocRef.current.value = "";
-    showToast("Hospital Registered", `${name} added as ${id}`);
+  function addDoctor(e: React.FormEvent) {
+    e.preventDefault();
+    if (!dName.trim()) { showToast("Error", "Doctor name is required", "var(--color-coral)"); return; }
+    const id = `D${String(doctors.length + 1).padStart(3, "0")}`;
+    setDoctors((prev) => [...prev, {
+      id, name: dName.trim(), specialization: dSpec,
+      experience: parseInt(dExp) || 0, phone: dPhone || "—", status: "Active",
+    }]);
+    setDName(""); setDExp(""); setDPhone("");
+    showToast("Doctor Registered", `${dName.trim()} added as ${id}`);
   }
 
-  function addPatient() {
-    const name = pNameRef.current?.value.trim();
-    if (!name) { showToast("Error", "Patient name required", "var(--color-coral)"); return; }
-    const id = `P00${patients.length + 1}`;
-    const gender = pGenderRef.current?.value || "Male";
-    const blood = pBloodRef.current?.value || "A+";
-    const hosp = pHospRef.current?.value.split(" ")[0] || "H001";
-    setPatients((prev) => [...prev, { id, name, gender, blood, hospital: hosp }]);
-    if (pNameRef.current) pNameRef.current.value = "";
-    setTableTab(1);
-    showToast("Patient Added", `${name} registered as ${id}`);
+  function addPatient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pName.trim()) { showToast("Error", "Patient name is required", "var(--color-coral)"); return; }
+    const id = `P${String(patients.length + 1).padStart(3, "0")}`;
+    setPatients((prev) => [...prev, {
+      id, name: pName.trim(), age: parseInt(pAge) || 0, gender: pGender,
+      blood: pBlood, phone: pPhone || "—",
+      registeredAt: new Date().toISOString().split("T")[0],
+    }]);
+    setPName(""); setPAge(""); setPPhone("");
+    showToast("Patient Registered", `${pName.trim()} added as ${id}`);
   }
 
-  function addRecord() {
-    const diag = rDiagRef.current?.value.trim();
-    if (!diag) { showToast("Error", "Diagnosis required", "var(--color-coral)"); return; }
-    const id = `R00${records.length + 1}`;
-    const patient = rPatientRef.current?.value.split("—")[1]?.trim() || "Unknown";
-    setRecords((prev) => [...prev, { id, patient, diagnosis: diag, doctor: "Dr. Auto-Assign" }]);
-    if (rDiagRef.current) rDiagRef.current.value = "";
-    if (rSympRef.current) rSympRef.current.value = "";
-    if (rMedsRef.current) rMedsRef.current.value = "";
-    showToast("Record Saved", `Medical record ${id} created for ${patient}`);
+  function addMedicine(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mName.trim()) { showToast("Error", "Medicine name is required", "var(--color-coral)"); return; }
+    const id = `M${String(medicines.length + 1).padStart(3, "0")}`;
+    setMedicines((prev) => [...prev, {
+      id, name: mName.trim(), category: mCategory || "General",
+      manufacturer: mManuf || "Unknown", stock: parseInt(mStock) || 0, unit: mUnit || "units",
+    }]);
+    setMName(""); setMCategory(""); setMManuf(""); setMStock(""); setMUnit("");
+    showToast("Medicine Added", `${mName.trim()} added to inventory`);
+  }
+
+  function addRecord(e: React.FormEvent) {
+    e.preventDefault();
+    if (!rDiag.trim()) { showToast("Error", "Diagnosis is required", "var(--color-coral)"); return; }
+    const id = `R${String(records.length + 1).padStart(3, "0")}`;
+    const patientName = rPatient ? patients.find((p) => p.id === rPatient)?.name || "Unknown" : patients[0]?.name || "Unknown";
+    const doctorName = rDoctor ? doctors.find((d) => d.id === rDoctor)?.name || "Unknown" : doctors[0]?.name || "Unknown";
+    setRecords((prev) => [...prev, {
+      id, patientName, doctorName, diagnosis: rDiag.trim(),
+      symptoms: rSymp || "—", medication: rMed || "—", dosage: rDose || "—",
+      date: new Date().toISOString().split("T")[0],
+    }]);
+    setRDiag(""); setRSymp(""); setRMed(""); setRDose("");
+    showToast("Record Created", `Medical record ${id} saved for ${patientName}`);
   }
 
   function runQuery() {
@@ -271,269 +213,464 @@ export default function DatabasePage() {
     }, 600);
   }
 
-  const inputClass = "w-full bg-surface-2 border border-border-2 rounded-lg px-3.5 py-2.5 text-text-primary font-sans text-sm outline-none transition-colors focus:border-cyan-2 focus:shadow-[0_0_0_3px_var(--color-cyan-dim)] placeholder:text-muted-2";
+  const hospName = hospital?.name || "Hospital Dashboard";
+  const hospId = hospital?.id || "H001";
+
+  /* ── Navigation Items ── */
+  const navItems = [
+    { key: "overview", label: "Overview", icon: "📊" },
+    { key: "doctors", label: "Doctors", icon: "👨‍⚕️", count: doctors.length },
+    { key: "patients", label: "Patients", icon: "🧑‍🤝‍🧑", count: patients.length },
+    { key: "medicines", label: "Medicines", icon: "💊", count: medicines.length },
+    { key: "records", label: "Medical Records", icon: "📋", count: records.length },
+    { key: "sql", label: "SQL Terminal", icon: "💻" },
+  ];
 
   return (
     <div className="page-section">
-      {/* ── Hero ── */}
-      <div className="grid grid-cols-2 gap-[60px] items-center px-[60px] pt-[60px] pb-10">
-        <div>
-          <h1 className="text-[52px] font-extrabold leading-[1.1] tracking-[-2px] mb-4">
-            Hospital<br />
-            <em className="not-italic text-primary">Database</em><br />
-            Registry
-          </h1>
-          <p className="text-muted text-base max-w-[420px] mb-8 leading-[1.7]">
-            Manage hospitals, doctors, patients, and medical records. All data stays local — never shared across the network.
-          </p>
-          <div className="flex gap-6 mb-8">
+      {/* ── Hospital Header ── */}
+      <div className="px-[60px] pt-[50px] pb-6">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-primary-light border border-primary/20 flex items-center justify-center text-2xl">
+            🏥
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight">
+              <span className="text-primary">{hospName}</span> Dashboard
+            </h1>
+            <p className="text-muted text-sm font-mono">
+              {hospId} · {hospital?.location || "Chennai"} · {hospital?.type || "Private"} · Registered: {hospital?.registeredAt || "2026-01-15"}
+            </p>
+          </div>
+        </div>
+
+        {/* ── Section Navigation ── */}
+        <div className="flex gap-1.5 bg-surface-2 border border-border-custom rounded-xl p-1.5 overflow-x-auto">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveSection(item.key as typeof activeSection)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-xs cursor-pointer border transition-all duration-200 tracking-wide whitespace-nowrap ${
+                activeSection === item.key
+                  ? "bg-primary-light text-primary border-primary/20 font-semibold"
+                  : "bg-transparent text-muted border-transparent hover:text-text-primary hover:bg-surface-3"
+              }`}
+            >
+              <span>{item.icon}</span>
+              {item.label}
+              {item.count !== undefined && (
+                <span className={`px-1.5 py-0 rounded font-mono text-[9px] ${
+                  activeSection === item.key
+                    ? "bg-primary/10 text-primary"
+                    : "bg-surface-3 text-muted"
+                }`}>
+                  {item.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ══════ OVERVIEW ══════ */}
+      {activeSection === "overview" && (
+        <div className="px-[60px] pb-[60px]">
+          {/* Stats cards */}
+          <div className="grid grid-cols-4 gap-5 mb-8">
             {[
-              { val: hospitals.length, label: "hospitals" },
-              { val: patients.length, label: "patients" },
-              { val: records.length, label: "records" },
-              { val: 4, label: "doctors" },
-            ].map((s) => (
-              <div key={s.label} className="bg-surface-2 border border-border-custom rounded-xl px-5 py-3.5">
-                <div className="text-[28px] font-extrabold text-primary font-mono leading-none">{s.val}</div>
-                <div className="text-[11px] text-muted font-mono mt-1">{s.label}</div>
-              </div>
+              { val: doctors.length, label: "Doctors", icon: "👨‍⚕️", color: "text-primary", bg: "bg-primary-light", onClick: () => setActiveSection("doctors") },
+              { val: patients.length, label: "Patients", icon: "🧑‍🤝‍🧑", color: "text-neon-green", bg: "bg-green-light", onClick: () => setActiveSection("patients") },
+              { val: medicines.length, label: "Medicines", icon: "💊", color: "text-amber", bg: "bg-amber-light", onClick: () => setActiveSection("medicines") },
+              { val: records.length, label: "Records", icon: "📋", color: "text-neon-blue", bg: "bg-blue-light", onClick: () => setActiveSection("records") },
+            ].map((card) => (
+              <button
+                key={card.label}
+                onClick={card.onClick}
+                className="bg-surface border border-border-custom rounded-2xl p-6 hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer text-left"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 rounded-xl ${card.bg} flex items-center justify-center text-xl`}>{card.icon}</div>
+                  <span className="text-muted text-lg">→</span>
+                </div>
+                <div className={`text-3xl font-extrabold font-mono ${card.color}`}>{card.val}</div>
+                <div className="text-xs text-muted font-mono mt-1">{card.label}</div>
+              </button>
             ))}
           </div>
-        </div>
-        <SchemaVisual />
-      </div>
 
-      {/* ── Content Panels ── */}
-      <div className="grid grid-cols-2 gap-6 px-[60px] pb-[60px]">
-        {/* Registration Panel */}
-        <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-custom">
-            <InnerTabs
-              tabs={["Register Hospital", "Add Patient", "Add Record"]}
-              activeTab={formTab}
-              onTabChange={setFormTab}
-            />
-          </div>
-
-          {/* Hospital Form */}
-          {formTab === 0 && (
-            <div className="p-5">
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">hospital name</label>
-                <input ref={hNameRef} className={inputClass} type="text" placeholder="e.g. City Care Hospital" />
+          {/* Recent Records */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Recent Medical Records</div>
+                <button onClick={() => setActiveSection("records")} className="font-mono text-[10px] text-primary cursor-pointer bg-transparent border-none hover:underline">View All →</button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="mb-3.5">
-                  <label className="block text-xs font-mono text-muted mb-1.5">location</label>
-                  <input ref={hLocRef} className={inputClass} type="text" placeholder="Chennai" />
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-xs font-mono text-muted mb-1.5">type</label>
-                  <select ref={hTypeRef} className={inputClass}>
-                    <option>Private</option>
-                    <option>Government</option>
-                    <option>Teaching</option>
-                  </select>
-                </div>
+              <div className="p-0">
+                {records.slice(-4).reverse().map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 px-5 py-3 border-b border-border-custom last:border-b-0 hover:bg-surface-2 transition-colors">
+                    <Badge variant="blue">{r.id}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{r.patientName} — {r.diagnosis}</div>
+                      <div className="font-mono text-[10px] text-muted">{r.doctorName} · {r.date}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">contact email</label>
-                <input ref={hEmailRef} className={inputClass} type="email" placeholder="admin@hospital.com" />
-              </div>
-              <button onClick={registerHospital} className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-primary text-white font-bold transition-all hover:bg-primary-dark hover:-translate-y-px tracking-wider shadow-sm">
-                Register Hospital →
-              </button>
             </div>
-          )}
 
-          {/* Patient Form */}
-          {formTab === 1 && (
-            <div className="p-5">
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">patient name</label>
-                <input ref={pNameRef} className={inputClass} type="text" placeholder="Full name" />
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Active Doctors</div>
+                <button onClick={() => setActiveSection("doctors")} className="font-mono text-[10px] text-primary cursor-pointer bg-transparent border-none hover:underline">Manage →</button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="mb-3.5">
-                  <label className="block text-xs font-mono text-muted mb-1.5">gender</label>
-                  <select ref={pGenderRef} className={inputClass}>
-                    <option>Male</option><option>Female</option><option>Other</option>
-                  </select>
-                </div>
-                <div className="mb-3.5">
-                  <label className="block text-xs font-mono text-muted mb-1.5">blood group</label>
-                  <select ref={pBloodRef} className={inputClass}>
-                    <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
-                    <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
-                  </select>
-                </div>
+              <div className="p-0">
+                {doctors.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 px-5 py-3 border-b border-border-custom last:border-b-0 hover:bg-surface-2 transition-colors">
+                    <Badge variant="cyan">{d.id}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{d.name}</div>
+                      <div className="font-mono text-[10px] text-muted">{d.specialization} · {d.experience} yrs</div>
+                    </div>
+                    <Badge variant={d.status === "Active" ? "green" : "amber"}>{d.status}</Badge>
+                  </div>
+                ))}
               </div>
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">hospital</label>
-                <select ref={pHospRef} className={inputClass}>
-                  <option>H001 — CityCare Hospital</option>
-                  <option>H002 — Green Valley Hospital</option>
-                  <option>H003 — National Medical Center</option>
-                </select>
-              </div>
-              <button onClick={addPatient} className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-neon-green text-white font-bold transition-all hover:opacity-90 hover:-translate-y-px tracking-wider shadow-sm">
-                Add Patient →
-              </button>
             </div>
-          )}
-
-          {/* Record Form */}
-          {formTab === 2 && (
-            <div className="p-5">
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">patient ID</label>
-                <select ref={rPatientRef} className={inputClass}>
-                  <option>P001 — Rohan Das</option>
-                  <option>P002 — Ananya Sen</option>
-                  <option>P003 — Karan Patel</option>
-                  <option>P004 — Meera Nair</option>
-                </select>
-              </div>
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">diagnosis</label>
-                <input ref={rDiagRef} className={inputClass} type="text" placeholder="e.g. Hypertension" />
-              </div>
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">symptoms</label>
-                <input ref={rSympRef} className={inputClass} type="text" placeholder="e.g. Headache, dizziness" />
-              </div>
-              <div className="mb-3.5">
-                <label className="block text-xs font-mono text-muted mb-1.5">prescribe medication</label>
-                <input ref={rMedsRef} className={inputClass} type="text" placeholder="e.g. Amlodipine 5mg" />
-              </div>
-              <button onClick={addRecord} className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-amber text-white font-bold transition-all hover:opacity-90 hover:-translate-y-px tracking-wider shadow-sm">
-                Save Record →
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Data Tables Panel */}
-        <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-custom">
-            <InnerTabs
-              tabs={["Hospitals", "Patients", "Records", "ML Updates"]}
-              activeTab={tableTab}
-              onTabChange={setTableTab}
-            />
-          </div>
-
-          <div className="overflow-x-auto pb-1">
-            {tableTab === 0 && (
-              <table className="db-table">
-                <thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Type</th><th>Status</th></tr></thead>
-                <tbody>
-                  {hospitals.map((h) => (
-                    <tr key={h.id}>
-                      <td><Badge variant="cyan">{h.id}</Badge></td>
-                      <td>{h.name}</td><td>{h.location}</td><td>{h.type}</td>
-                      <td><Badge variant="green">Active</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {tableTab === 1 && (
-              <table className="db-table">
-                <thead><tr><th>ID</th><th>Name</th><th>Gender</th><th>Blood</th><th>Hospital</th></tr></thead>
-                <tbody>
-                  {patients.map((p) => (
-                    <tr key={p.id}>
-                      <td><Badge variant="amber">{p.id}</Badge></td>
-                      <td>{p.name}</td><td>{p.gender}</td><td>{p.blood}</td><td>{p.hospital}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {tableTab === 2 && (
-              <table className="db-table">
-                <thead><tr><th>ID</th><th>Patient</th><th>Diagnosis</th><th>Doctor</th></tr></thead>
-                <tbody>
-                  {records.map((r) => (
-                    <tr key={r.id}>
-                      <td><Badge variant="blue">{r.id}</Badge></td>
-                      <td>{r.patient}</td><td>{r.diagnosis}</td><td>{r.doctor}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            {tableTab === 3 && (
-              <table className="db-table">
-                <thead><tr><th>Update ID</th><th>Hospital</th><th>Round</th><th>Accuracy</th><th>Hash</th></tr></thead>
-                <tbody>
-                  {updates.map((u) => (
-                    <tr key={u.id}>
-                      <td><Badge variant="coral">{u.id}</Badge></td>
-                      <td>{u.hospital}</td><td>{u.round}</td><td>{u.accuracy}</td>
-                      <td className="font-mono text-[10px] text-neon-green">{u.hash}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
         </div>
+      )}
 
-        {/* SQL Query Runner */}
-        <div className="col-span-2 bg-surface border border-border-custom rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border-custom">
-            <div className="font-mono text-[11px] text-muted uppercase tracking-widest">SQL Query Runner</div>
-            <div className="flex gap-2">
-              <Badge variant="green">PostgreSQL 15</Badge>
-              <Badge variant="cyan">flockchain_hospital_db</Badge>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 p-5">
-            <div>
-              <label className="block text-xs font-mono text-muted mb-2">query editor</label>
-              <textarea
-                value={sqlQuery}
-                onChange={(e) => setSqlQuery(e.target.value)}
-                className="w-full font-mono text-xs bg-surface-2 border border-border-2 rounded-lg p-3.5 text-text-primary min-h-[90px] resize-y outline-none leading-[1.7]"
-              />
-              <div className="flex gap-2 mt-2.5">
-                <button onClick={runQuery} className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-primary text-white font-bold transition-all hover:bg-primary-dark hover:-translate-y-px tracking-wider shadow-sm">
-                  Run Query ▶
+      {/* ══════ DOCTORS ══════ */}
+      {activeSection === "doctors" && (
+        <div className="px-[60px] pb-[60px]">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Register form */}
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Register New Doctor</div>
+              </div>
+              <form onSubmit={addDoctor} className="p-5 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">doctor name *</label>
+                  <input value={dName} onChange={(e) => setDName(e.target.value)} className={inputClass} placeholder="e.g. Dr. Arjun Mehta" required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">specialization</label>
+                    <select value={dSpec} onChange={(e) => setDSpec(e.target.value)} className={inputClass}>
+                      <option>Cardiology</option><option>Neurology</option><option>Endocrinology</option>
+                      <option>General Medicine</option><option>Orthopedics</option><option>Dermatology</option>
+                      <option>Pediatrics</option><option>Oncology</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">experience (years)</label>
+                    <input type="number" value={dExp} onChange={(e) => setDExp(e.target.value)} className={inputClass} placeholder="e.g. 10" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">phone</label>
+                  <input type="tel" value={dPhone} onChange={(e) => setDPhone(e.target.value)} className={inputClass} placeholder="+91-XXXXXXXXXX" />
+                </div>
+                <button type="submit" className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-primary text-white font-bold transition-all hover:bg-primary-dark hover:-translate-y-px tracking-wider shadow-sm">
+                  Register Doctor →
                 </button>
-                <button onClick={() => setSqlQuery(presets[0])} className="px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer bg-transparent text-primary border border-primary/30 transition-all hover:bg-primary-light tracking-wider">
-                  Disease Prevalence
-                </button>
-                <button onClick={() => setSqlQuery(presets[1])} className="px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer bg-transparent text-primary border border-primary/30 transition-all hover:bg-primary-light tracking-wider">
-                  FL Contributions
-                </button>
-              </div>
+              </form>
             </div>
-            <div>
-              <label className="block text-xs font-mono text-muted mb-2">results</label>
-              <div className="bg-surface-2 border border-border-2 rounded-lg p-3.5 min-h-[130px] font-mono text-[11px] text-muted overflow-x-auto">
-                {queryRunning ? (
-                  <span className="text-primary">Executing query...</span>
-                ) : queryResult ? (
-                  <table className="db-table">
-                    <thead>
-                      <tr>{queryResult.headers.map((h) => <th key={h}>{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {queryResult.rows.map((row, i) => (
-                        <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <span className="text-muted-2">{"// Press Run Query to execute..."}</span>
-                )}
+
+            {/* Table */}
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">All Doctors</div>
+                <Badge variant="cyan">{doctors.length} registered</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="db-table">
+                  <thead><tr><th>ID</th><th>Name</th><th>Specialization</th><th>Exp</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {doctors.map((d) => (
+                      <tr key={d.id}>
+                        <td><Badge variant="cyan">{d.id}</Badge></td>
+                        <td>{d.name}</td><td>{d.specialization}</td><td>{d.experience} yrs</td>
+                        <td><Badge variant={d.status === "Active" ? "green" : "amber"}>{d.status}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ══════ PATIENTS ══════ */}
+      {activeSection === "patients" && (
+        <div className="px-[60px] pb-[60px]">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Register New Patient</div>
+              </div>
+              <form onSubmit={addPatient} className="p-5 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">patient name *</label>
+                  <input value={pName} onChange={(e) => setPName(e.target.value)} className={inputClass} placeholder="Full name" required />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">age</label>
+                    <input type="number" value={pAge} onChange={(e) => setPAge(e.target.value)} className={inputClass} placeholder="e.g. 36" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">gender</label>
+                    <select value={pGender} onChange={(e) => setPGender(e.target.value)} className={inputClass}>
+                      <option>Male</option><option>Female</option><option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">blood group</label>
+                    <select value={pBlood} onChange={(e) => setPBlood(e.target.value)} className={inputClass}>
+                      <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                      <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">phone</label>
+                  <input type="tel" value={pPhone} onChange={(e) => setPPhone(e.target.value)} className={inputClass} placeholder="+91-XXXXXXXXXX" />
+                </div>
+                <button type="submit" className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-neon-green text-white font-bold transition-all hover:opacity-90 hover:-translate-y-px tracking-wider shadow-sm">
+                  Register Patient →
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">All Patients</div>
+                <Badge variant="green">{patients.length} registered</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="db-table">
+                  <thead><tr><th>ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Blood</th><th>Registered</th></tr></thead>
+                  <tbody>
+                    {patients.map((p) => (
+                      <tr key={p.id}>
+                        <td><Badge variant="amber">{p.id}</Badge></td>
+                        <td>{p.name}</td><td>{p.age}</td><td>{p.gender}</td><td>{p.blood}</td>
+                        <td className="font-mono text-[10px]">{p.registeredAt}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ MEDICINES ══════ */}
+      {activeSection === "medicines" && (
+        <div className="px-[60px] pb-[60px]">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Add New Medicine</div>
+              </div>
+              <form onSubmit={addMedicine} className="p-5 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">medicine name *</label>
+                  <input value={mName} onChange={(e) => setMName(e.target.value)} className={inputClass} placeholder="e.g. Amlodipine" required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">category</label>
+                    <input value={mCategory} onChange={(e) => setMCategory(e.target.value)} className={inputClass} placeholder="e.g. Antihypertensive" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">manufacturer</label>
+                    <input value={mManuf} onChange={(e) => setMManuf(e.target.value)} className={inputClass} placeholder="e.g. Cipla" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">stock quantity</label>
+                    <input type="number" value={mStock} onChange={(e) => setMStock(e.target.value)} className={inputClass} placeholder="e.g. 500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">unit</label>
+                    <input value={mUnit} onChange={(e) => setMUnit(e.target.value)} className={inputClass} placeholder="e.g. 5mg tablets" />
+                  </div>
+                </div>
+                <button type="submit" className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-amber text-white font-bold transition-all hover:opacity-90 hover:-translate-y-px tracking-wider shadow-sm">
+                  Add Medicine →
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Medicine Inventory</div>
+                <Badge variant="amber">{medicines.length} items</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="db-table">
+                  <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Manufacturer</th><th>Stock</th></tr></thead>
+                  <tbody>
+                    {medicines.map((m) => (
+                      <tr key={m.id}>
+                        <td><Badge variant="amber">{m.id}</Badge></td>
+                        <td>{m.name}</td><td>{m.category}</td><td>{m.manufacturer}</td>
+                        <td>
+                          <span className={`font-mono text-xs font-bold ${m.stock < 100 ? "text-coral" : m.stock < 300 ? "text-amber" : "text-neon-green"}`}>
+                            {m.stock}
+                          </span>
+                          <span className="text-muted text-[10px] ml-1">{m.unit}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ MEDICAL RECORDS ══════ */}
+      {activeSection === "records" && (
+        <div className="px-[60px] pb-[60px]">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">Create Medical Record</div>
+              </div>
+              <form onSubmit={addRecord} className="p-5 space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">patient</label>
+                    <select value={rPatient} onChange={(e) => setRPatient(e.target.value)} className={inputClass}>
+                      {patients.map((p) => <option key={p.id} value={p.id}>{p.id} — {p.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">attending doctor</label>
+                    <select value={rDoctor} onChange={(e) => setRDoctor(e.target.value)} className={inputClass}>
+                      {doctors.map((d) => <option key={d.id} value={d.id}>{d.id} — {d.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">diagnosis *</label>
+                  <input value={rDiag} onChange={(e) => setRDiag(e.target.value)} className={inputClass} placeholder="e.g. Hypertension" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-mono text-muted mb-1.5">symptoms</label>
+                  <input value={rSymp} onChange={(e) => setRSymp(e.target.value)} className={inputClass} placeholder="e.g. Headache, dizziness" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">medication</label>
+                    <select value={rMed} onChange={(e) => setRMed(e.target.value)} className={inputClass}>
+                      <option value="">Select medicine...</option>
+                      {medicines.map((m) => <option key={m.id} value={m.name}>{m.name} ({m.unit})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono text-muted mb-1.5">dosage</label>
+                    <input value={rDose} onChange={(e) => setRDose(e.target.value)} className={inputClass} placeholder="e.g. 5mg daily" />
+                  </div>
+                </div>
+                <button type="submit" className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-neon-blue text-white font-bold transition-all hover:opacity-90 hover:-translate-y-px tracking-wider shadow-sm">
+                  Save Record →
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between">
+                <div className="font-mono text-[11px] text-muted uppercase tracking-widest">All Medical Records</div>
+                <Badge variant="blue">{records.length} records</Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="db-table">
+                  <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Diagnosis</th><th>Medication</th><th>Date</th></tr></thead>
+                  <tbody>
+                    {records.map((r) => (
+                      <tr key={r.id}>
+                        <td><Badge variant="blue">{r.id}</Badge></td>
+                        <td>{r.patientName}</td><td className="text-xs">{r.doctorName}</td>
+                        <td>{r.diagnosis}</td><td>{r.medication}</td>
+                        <td className="font-mono text-[10px]">{r.date}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ SQL TERMINAL ══════ */}
+      {activeSection === "sql" && (
+        <div className="px-[60px] pb-[60px]">
+          <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-custom">
+              <div className="font-mono text-[11px] text-muted uppercase tracking-widest">SQL Query Runner</div>
+              <div className="flex gap-2">
+                <Badge variant="green">PostgreSQL 15</Badge>
+                <Badge variant="cyan">trustfl_{hospId.toLowerCase()}_db</Badge>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 p-5">
+              <div>
+                <label className="block text-xs font-mono text-muted mb-2">query editor</label>
+                <textarea
+                  value={sqlQuery}
+                  onChange={(e) => setSqlQuery(e.target.value)}
+                  className="w-full font-mono text-xs bg-surface-2 border border-border-2 rounded-lg p-3.5 text-text-primary min-h-[120px] resize-y outline-none leading-[1.7]"
+                />
+                <div className="flex gap-2 mt-2.5 flex-wrap">
+                  <button onClick={runQuery} className="px-6 py-2.5 rounded-lg font-mono text-xs cursor-pointer border-none bg-primary text-white font-bold transition-all hover:bg-primary-dark hover:-translate-y-px tracking-wider shadow-sm">
+                    Run Query ▶
+                  </button>
+                  {presets.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSqlQuery(p.query)}
+                      className="px-4 py-2 rounded-lg font-mono text-[10px] cursor-pointer bg-transparent text-primary border border-primary/30 transition-all hover:bg-primary-light tracking-wider"
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-mono text-muted mb-2">results</label>
+                <div className="bg-surface-2 border border-border-2 rounded-lg p-3.5 min-h-[160px] font-mono text-[11px] text-muted overflow-x-auto">
+                  {queryRunning ? (
+                    <span className="text-primary">Executing query...</span>
+                  ) : queryResult ? (
+                    <table className="db-table">
+                      <thead>
+                        <tr>{queryResult.headers.map((h) => <th key={h}>{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {queryResult.rows.map((row, i) => (
+                          <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <span className="text-muted-2">{"// Press Run Query to execute..."}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
