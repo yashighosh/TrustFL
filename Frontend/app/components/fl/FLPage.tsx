@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import NetworkCanvas from "./NetworkCanvas";
 import AccuracyChart, { type AccuracyChartHandle } from "./AccuracyChart";
+import Leaderboard from "./Leaderboard";
 
 /* ──────── Types ──────── */
 interface LogEntry {
@@ -396,6 +397,11 @@ export default function FLPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Leaderboard — full width */}
+        <div className="col-span-2">
+          <Leaderboard />
         </div>
       </div>
     </div>
