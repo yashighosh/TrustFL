@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "@/app/lib/api";
 
 /* ──────── Types ──────── */
 interface HospitalSummary {
@@ -19,40 +20,7 @@ interface HospitalSummary {
   registeredAt: string;
 }
 
-/* ──────── Mock Network Data ──────── */
-const networkHospitals: HospitalSummary[] = [
-  { id: "H001", name: "CityCare Hospital", location: "Chennai", type: "Private", doctors: 3, patients: 4, records: 4, medicines: 4, flRounds: 10, accuracy: "89.3%", reputation: 0.80, status: "active", registeredAt: "2026-01-15" },
-  { id: "H002", name: "Green Valley Hospital", location: "Bangalore", type: "Private", doctors: 2, patients: 3, records: 3, medicines: 3, flRounds: 10, accuracy: "87.1%", reputation: 0.75, status: "active", registeredAt: "2026-01-20" },
-  { id: "H003", name: "National Medical Center", location: "Delhi", type: "Government", doctors: 4, patients: 6, records: 5, medicines: 5, flRounds: 10, accuracy: "91.2%", reputation: 0.85, status: "active", registeredAt: "2026-02-01" },
-];
-
-const networkDoctors = [
-  { id: "D001", name: "Dr. Arjun Mehta", specialization: "Cardiology", hospital: "H001", hospitalName: "CityCare Hospital", experience: 10 },
-  { id: "D002", name: "Dr. Priya Sharma", specialization: "Endocrinology", hospital: "H001", hospitalName: "CityCare Hospital", experience: 8 },
-  { id: "D003", name: "Dr. Rahul Verma", specialization: "General Medicine", hospital: "H002", hospitalName: "Green Valley Hospital", experience: 12 },
-  { id: "D004", name: "Dr. Neha Kapoor", specialization: "Neurology", hospital: "H003", hospitalName: "National Medical Center", experience: 9 },
-  { id: "D005", name: "Dr. Suresh Iyer", specialization: "Orthopedics", hospital: "H003", hospitalName: "National Medical Center", experience: 15 },
-  { id: "D006", name: "Dr. Kavitha Rajan", specialization: "Pediatrics", hospital: "H002", hospitalName: "Green Valley Hospital", experience: 7 },
-  { id: "D007", name: "Dr. Deepak Joshi", specialization: "Oncology", hospital: "H003", hospitalName: "National Medical Center", experience: 11 },
-  { id: "D008", name: "Dr. Aarti Singh", specialization: "Dermatology", hospital: "H003", hospitalName: "National Medical Center", experience: 6 },
-  { id: "D009", name: "Dr. Mohan Das", specialization: "Cardiology", hospital: "H001", hospitalName: "CityCare Hospital", experience: 14 },
-];
-
-const networkPatients = [
-  { id: "P001", name: "Rohan Das", age: 36, blood: "B+", hospital: "H001", hospitalName: "CityCare Hospital" },
-  { id: "P002", name: "Ananya Sen", age: 28, blood: "O+", hospital: "H001", hospitalName: "CityCare Hospital" },
-  { id: "P003", name: "Karan Patel", age: 45, blood: "A+", hospital: "H002", hospitalName: "Green Valley Hospital" },
-  { id: "P004", name: "Meera Nair", age: 32, blood: "AB+", hospital: "H003", hospitalName: "National Medical Center" },
-  { id: "P005", name: "Vikram Reddy", age: 52, blood: "O-", hospital: "H003", hospitalName: "National Medical Center" },
-  { id: "P006", name: "Sneha Kulkarni", age: 41, blood: "A-", hospital: "H002", hospitalName: "Green Valley Hospital" },
-  { id: "P007", name: "Arjun Nambiar", age: 58, blood: "B-", hospital: "H003", hospitalName: "National Medical Center" },
-  { id: "P008", name: "Priya Deshmukh", age: 23, blood: "AB-", hospital: "H001", hospitalName: "CityCare Hospital" },
-  { id: "P009", name: "Rajesh Gupta", age: 47, blood: "A+", hospital: "H002", hospitalName: "Green Valley Hospital" },
-  { id: "P010", name: "Lakshmi Menon", age: 39, blood: "O+", hospital: "H001", hospitalName: "CityCare Hospital" },
-  { id: "P011", name: "Sanjay Pillai", age: 63, blood: "B+", hospital: "H003", hospitalName: "National Medical Center" },
-  { id: "P012", name: "Nandini Rao", age: 29, blood: "A+", hospital: "H003", hospitalName: "National Medical Center" },
-  { id: "P013", name: "Amit Chopra", age: 44, blood: "O+", hospital: "H003", hospitalName: "National Medical Center" },
-];
+/* ──────── Mock Data Removed ──────── */
 
 /* ──────── Badge ──────── */
 function Badge({ children, variant }: { children: React.ReactNode; variant: "green" | "cyan" | "amber" | "coral" | "blue" }) {
@@ -75,10 +43,36 @@ export default function NetworkOverview() {
   const [selectedHospital, setSelectedHospital] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"hospitals" | "doctors" | "patients">("hospitals");
 
-  const totalDoctors = networkHospitals.reduce((s, h) => s + h.doctors, 0);
-  const totalPatients = networkHospitals.reduce((s, h) => s + h.patients, 0);
-  const totalRecords = networkHospitals.reduce((s, h) => s + h.records, 0);
-  const avgAccuracy = (networkHospitals.reduce((s, h) => s + parseFloat(h.accuracy), 0) / networkHospitals.length).toFixed(1);
+  const [networkHospitals, setNetworkHospitals] = useState<HospitalSummary[]>([]);
+  const [networkDoctors, setNetworkDoctors] = useState<any[]>([]);
+  const [networkPatients, setNetworkPatients] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({});
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [netRes, docRes, patRes] = await Promise.all([
+          apiFetch("/admin/network-overview"),
+          apiFetch("/admin/doctors"),
+          apiFetch("/admin/patients")
+        ]);
+        setNetworkHospitals(netRes.hospitals);
+        setSummary(netRes.summary);
+        setNetworkDoctors(docRes);
+        setNetworkPatients(patRes);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadStats();
+  }, []);
+
+  const totalDoctors = summary.total_doctors || 0;
+  const totalPatients = summary.total_patients || 0;
+  const totalRecords = summary.total_records || 0;
+  const avgAccuracy = networkHospitals.length > 0 
+    ? (networkHospitals.reduce((s, h) => s + parseFloat(h.accuracy), 0) / networkHospitals.length).toFixed(1) 
+    : "0.0";
 
   const filteredDoctors = selectedHospital ? networkDoctors.filter((d) => d.hospital === selectedHospital) : networkDoctors;
   const filteredPatients = selectedHospital ? networkPatients.filter((p) => p.hospital === selectedHospital) : networkPatients;
