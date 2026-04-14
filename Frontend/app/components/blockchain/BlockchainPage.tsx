@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
+import { apiFetch } from "@/app/lib/api";
 
 /* ──────── Types ──────── */
 interface ChainBlock {
@@ -32,12 +33,7 @@ function getTs() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-const initialBlocks: ChainBlock[] = [
-  { num: 0, type: "genesis", hosp: "GENESIS", hash: "0x000000000000", prev: "0x000000000000", status: "verified", acc: null, round: "—", timestamp: getTs() },
-  { num: 1, type: "block", hosp: "H001", hash: "0xabc123hash456", prev: "0x000000000000", status: "verified", acc: "89%", round: "TR001", timestamp: getTs() },
-  { num: 2, type: "block", hosp: "H002", hash: "0xdef456hash789", prev: "0xabc123hash456", status: "verified", acc: "87%", round: "TR001", timestamp: getTs() },
-  { num: 3, type: "block", hosp: "H003", hash: "0xxyz789hash012", prev: "0xdef456hash789", status: "pending", acc: "91%", round: "TR002", timestamp: getTs() },
-];
+/* ──────── initialBlocks replaced by API ──────── */
 
 /* ──────── Badge ──────── */
 function Badge({ children, variant }: { children: React.ReactNode; variant: string }) {
@@ -141,7 +137,37 @@ function BlockDetail({ block, onClose }: { block: ChainBlock; onClose: () => voi
 /* ══════════════════════════ BLOCKCHAIN PAGE ══════════════════════════ */
 export default function BlockchainPage() {
   const { showToast } = useToast();
-  const [chainBlocks, setChainBlocks] = useState<ChainBlock[]>(initialBlocks);
+  const [chainBlocks, setChainBlocks] = useState<ChainBlock[]>([]);
+  
+  useEffect(() => {
+    const fetchLedger = async () => {
+      try {
+        const data = await apiFetch("/blockchain/ledger");
+        const formatted: ChainBlock[] = [
+          { num: 0, type: "genesis", hosp: "GENESIS", hash: "0x000000000000", prev: "0x000000000000", status: "verified", acc: null, round: "—", timestamp: getTs() }
+        ];
+        
+        data.reverse().forEach((item: any, idx: number) => {
+          formatted.push({
+            num: idx + 1,
+            type: "block",
+            hosp: item.hospital || "Unknown",
+            hash: item.transaction_hash,
+            prev: formatted[idx].hash,
+            status: item.status.toLowerCase(),
+            acc: "—", // Missing in block, would need ModelUpdate inclusion
+            round: item.update_id.split("-")[0] || "—",
+            timestamp: new Date(item.timestamp).toLocaleTimeString()
+          });
+        });
+        
+        setChainBlocks(formatted);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchLedger();
+  }, []);
   const [verifyIdx, setVerifyIdx] = useState(0);
   const [hashDisplay, setHashDisplay] = useState(hashes[0] + "...");
   const [selectedBlock, setSelectedBlock] = useState<ChainBlock | null>(null);
