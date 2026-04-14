@@ -10,5 +10,12 @@
 !*Frontend*/
 !*Frontend*/**
 
+# Un-ignore the backend directory
+!backend/
+!backend/**
+
+# Un-ignore docker files in root
+!docker-compose.yml
+
 # Also keep .gitignore to track it
 !.gitignore
