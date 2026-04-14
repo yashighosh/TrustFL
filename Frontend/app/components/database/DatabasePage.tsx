@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/app/context/ToastContext";
 import { useHospital } from "@/app/context/HospitalContext";
+import { apiFetch } from "@/app/lib/api";
 
 /* ──────── Types ──────── */
 interface Doctor {
@@ -44,33 +45,7 @@ interface MedRecord {
   date: string;
 }
 
-/* ──────── Initial Data (Demo) ──────── */
-const seedDoctors: Doctor[] = [
-  { id: "D001", name: "Dr. Arjun Mehta", specialization: "Cardiology", experience: 10, phone: "+91-9800011111", status: "Active" },
-  { id: "D002", name: "Dr. Priya Sharma", specialization: "Endocrinology", experience: 8, phone: "+91-9800022222", status: "Active" },
-  { id: "D003", name: "Dr. Rahul Verma", specialization: "General Medicine", experience: 12, phone: "+91-9800033333", status: "On Leave" },
-];
-
-const seedPatients: Patient[] = [
-  { id: "P001", name: "Rohan Das", age: 36, gender: "Male", blood: "B+", phone: "+91-9876543210", registeredAt: "2026-01-15" },
-  { id: "P002", name: "Ananya Sen", age: 28, gender: "Female", blood: "O+", phone: "+91-9123456789", registeredAt: "2026-02-10" },
-  { id: "P003", name: "Karan Patel", age: 45, gender: "Male", blood: "A+", phone: "+91-9998887776", registeredAt: "2026-02-22" },
-  { id: "P004", name: "Meera Nair", age: 32, gender: "Female", blood: "AB+", phone: "+91-9555444333", registeredAt: "2026-03-01" },
-];
-
-const seedMedicines: Medicine[] = [
-  { id: "M001", name: "Amlodipine", category: "Antihypertensive", manufacturer: "Cipla", stock: 500, unit: "5mg tablets" },
-  { id: "M002", name: "Metformin", category: "Antidiabetic", manufacturer: "Sun Pharma", stock: 350, unit: "500mg tablets" },
-  { id: "M003", name: "Paracetamol", category: "Analgesic", manufacturer: "GSK", stock: 1200, unit: "650mg tablets" },
-  { id: "M004", name: "Atorvastatin", category: "Statin", manufacturer: "Ranbaxy", stock: 200, unit: "10mg tablets" },
-];
-
-const seedRecords: MedRecord[] = [
-  { id: "R001", patientName: "Rohan Das", doctorName: "Dr. Arjun Mehta", diagnosis: "Hypertension", symptoms: "Headache, dizziness", medication: "Amlodipine", dosage: "5mg daily", date: "2026-03-10" },
-  { id: "R002", patientName: "Ananya Sen", doctorName: "Dr. Priya Sharma", diagnosis: "Type 2 Diabetes", symptoms: "Fatigue, thirst", medication: "Metformin", dosage: "500mg twice daily", date: "2026-03-12" },
-  { id: "R003", patientName: "Karan Patel", doctorName: "Dr. Rahul Verma", diagnosis: "Viral Fever", symptoms: "High temp, body pain", medication: "Paracetamol", dosage: "650mg thrice daily", date: "2026-03-18" },
-  { id: "R004", patientName: "Meera Nair", doctorName: "Dr. Arjun Mehta", diagnosis: "Migraine", symptoms: "Severe headache, nausea", medication: "Sumatriptan", dosage: "50mg as needed", date: "2026-03-25" },
-];
+/* ──────── Initial Data (Removing Mocks, starting empty) ──────── */
 
 /* ──────── Badge ──────── */
 function Badge({ children, variant }: { children: React.ReactNode; variant: "green" | "cyan" | "amber" | "coral" | "blue" }) {
@@ -108,10 +83,70 @@ export default function DatabasePage() {
   const { showToast } = useToast();
   const { hospital } = useHospital();
 
-  const [doctors, setDoctors] = useState<Doctor[]>(seedDoctors);
-  const [patients, setPatients] = useState<Patient[]>(seedPatients);
-  const [medicines, setMedicines] = useState<Medicine[]>(seedMedicines);
-  const [records, setRecords] = useState<MedRecord[]>(seedRecords);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [records, setRecords] = useState<MedRecord[]>([]);
+
+  // Fetch initial data
+  const fetchData = async () => {
+    try {
+      const [dRes, pRes, mRes, rRes] = await Promise.all([
+        apiFetch("/doctors/"),
+        apiFetch("/patients/"),
+        apiFetch("/medicines/"),
+        apiFetch("/records/")
+      ]);
+      
+      setDoctors(dRes.map((d: any) => ({
+        id: d.doctor_id,
+        name: d.doctor_name,
+        specialization: d.specialization || "General",
+        experience: d.experience_years || 0,
+        phone: d.contact_number || "—",
+        status: d.status || "Active"
+      })));
+
+      setPatients(pRes.map((p: any) => ({
+        id: p.patient_id,
+        name: p.patient_name,
+        age: 30, // Default if date_of_birth is missing or to simplify
+        gender: p.gender || "Unknown",
+        blood: p.blood_group || "Unknown",
+        phone: p.contact_phone || "—",
+        registeredAt: p.registration_date ? p.registration_date.split("T")[0] : "—"
+      })));
+
+      setMedicines(mRes.map((m: any) => ({
+        id: m.medicine_id,
+        name: m.medicine_name,
+        category: m.category || "General",
+        manufacturer: m.manufacturer || "Unknown",
+        stock: m.stock || 0,
+        unit: m.unit || "N/A"
+      })));
+
+      setRecords(rRes.map((r: any) => ({
+        id: r.record_id,
+        patientName: r.patient_id, // Would be joined name ideally
+        doctorName: r.doctor_id,   // Would be joined name ideally
+        diagnosis: r.diagnosis || "—",
+        symptoms: r.symptoms || "—",
+        medication: "—",
+        dosage: "—",
+        date: r.visit_date ? r.visit_date.split("T")[0] : "—"
+      })));
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load dashboard data.", "error");
+    }
+  };
+
+  useEffect(() => {
+    if (hospital) {
+      fetchData();
+    }
+  }, [hospital]);
 
   const [activeSection, setActiveSection] = useState<"overview" | "doctors" | "patients" | "medicines" | "records" | "sql">("overview");
 
@@ -151,56 +186,130 @@ export default function DatabasePage() {
   const inputClass = "w-full bg-surface-2 border border-border-2 rounded-lg px-3.5 py-2.5 text-text-primary font-sans text-sm outline-none transition-colors focus:border-cyan-2 focus:shadow-[0_0_0_3px_var(--color-cyan-dim)] placeholder:text-muted-2";
 
   /* ── Actions ── */
-  function addDoctor(e: React.FormEvent) {
+  async function addDoctor(e: React.FormEvent) {
     e.preventDefault();
     if (!dName.trim()) { showToast("Error", "Doctor name is required", "var(--color-coral)"); return; }
-    const id = `D${String(doctors.length + 1).padStart(3, "0")}`;
-    setDoctors((prev) => [...prev, {
-      id, name: dName.trim(), specialization: dSpec,
-      experience: parseInt(dExp) || 0, phone: dPhone || "—", status: "Active",
-    }]);
-    setDName(""); setDExp(""); setDPhone("");
-    showToast("Doctor Registered", `${dName.trim()} added as ${id}`);
+    
+    try {
+      const generatedId = `D${String(doctors.length + 1).padStart(3, "0")}`;
+      const res = await apiFetch("/doctors/", {
+        method: "POST",
+        body: JSON.stringify({
+          doctor_id: generatedId,
+          doctor_name: dName.trim(),
+          specialization: dSpec,
+          experience_years: parseInt(dExp) || 0,
+          contact_number: dPhone || undefined,
+          status: "Active"
+        })
+      });
+      
+      setDoctors((prev) => [...prev, {
+        id: res.doctor_id, name: res.doctor_name, specialization: res.specialization || "General",
+        experience: res.experience_years || 0, phone: res.contact_number || "—", status: "Active",
+      }]);
+      setDName(""); setDExp(""); setDPhone("");
+      showToast("Doctor Registered", `${res.doctor_name} added successfully`);
+    } catch (err: any) {
+      showToast("Error", err.message || "Failed to add doctor", "var(--color-coral)");
+    }
   }
 
-  function addPatient(e: React.FormEvent) {
+  async function addPatient(e: React.FormEvent) {
     e.preventDefault();
     if (!pName.trim()) { showToast("Error", "Patient name is required", "var(--color-coral)"); return; }
-    const id = `P${String(patients.length + 1).padStart(3, "0")}`;
-    setPatients((prev) => [...prev, {
-      id, name: pName.trim(), age: parseInt(pAge) || 0, gender: pGender,
-      blood: pBlood, phone: pPhone || "—",
-      registeredAt: new Date().toISOString().split("T")[0],
-    }]);
-    setPName(""); setPAge(""); setPPhone("");
-    showToast("Patient Registered", `${pName.trim()} added as ${id}`);
+    
+    try {
+      const generatedId = `P${String(patients.length + 1).padStart(3, "0")}`;
+      const res = await apiFetch("/patients/", {
+        method: "POST",
+        body: JSON.stringify({
+          patient_id: generatedId,
+          patient_name: pName.trim(),
+          gender: pGender,
+          blood_group: pBlood,
+          contact_phone: pPhone || undefined,
+        })
+      });
+      
+      setPatients((prev) => [...prev, {
+        id: res.patient_id, name: res.patient_name, age: 30, gender: res.gender || "Unknown",
+        blood: res.blood_group || "Unknown", phone: res.contact_phone || "—",
+        registeredAt: new Date().toISOString().split("T")[0],
+      }]);
+      setPName(""); setPAge(""); setPPhone("");
+      showToast("Patient Registered", `${res.patient_name} added successfully`);
+    } catch (err: any) {
+      showToast("Error", err.message || "Failed to add patient", "var(--color-coral)");
+    }
   }
 
-  function addMedicine(e: React.FormEvent) {
+  async function addMedicine(e: React.FormEvent) {
     e.preventDefault();
     if (!mName.trim()) { showToast("Error", "Medicine name is required", "var(--color-coral)"); return; }
-    const id = `M${String(medicines.length + 1).padStart(3, "0")}`;
-    setMedicines((prev) => [...prev, {
-      id, name: mName.trim(), category: mCategory || "General",
-      manufacturer: mManuf || "Unknown", stock: parseInt(mStock) || 0, unit: mUnit || "units",
-    }]);
-    setMName(""); setMCategory(""); setMManuf(""); setMStock(""); setMUnit("");
-    showToast("Medicine Added", `${mName.trim()} added to inventory`);
+    
+    try {
+      const generatedId = `M${String(medicines.length + 1).padStart(3, "0")}`;
+      const res = await apiFetch("/medicines/", {
+        method: "POST",
+        body: JSON.stringify({
+          medicine_id: generatedId,
+          medicine_name: mName.trim(),
+          category: mCategory || "General",
+          manufacturer: mManuf || "Unknown",
+          stock: parseInt(mStock) || 0,
+          unit: mUnit || "units"
+        })
+      });
+      
+      setMedicines((prev) => [...prev, {
+        id: res.medicine_id, name: res.medicine_name, category: res.category || "General",
+        manufacturer: res.manufacturer || "Unknown", stock: res.stock || 0, unit: res.unit || "N/A",
+      }]);
+      setMName(""); setMCategory(""); setMManuf(""); setMStock(""); setMUnit("");
+      showToast("Medicine Added", `${res.medicine_name} added to inventory`);
+    } catch (err: any) {
+      showToast("Error", err.message || "Failed to add medicine", "var(--color-coral)");
+    }
   }
 
-  function addRecord(e: React.FormEvent) {
+  async function addRecord(e: React.FormEvent) {
     e.preventDefault();
     if (!rDiag.trim()) { showToast("Error", "Diagnosis is required", "var(--color-coral)"); return; }
-    const id = `R${String(records.length + 1).padStart(3, "0")}`;
-    const patientName = rPatient ? patients.find((p) => p.id === rPatient)?.name || "Unknown" : patients[0]?.name || "Unknown";
-    const doctorName = rDoctor ? doctors.find((d) => d.id === rDoctor)?.name || "Unknown" : doctors[0]?.name || "Unknown";
-    setRecords((prev) => [...prev, {
-      id, patientName, doctorName, diagnosis: rDiag.trim(),
-      symptoms: rSymp || "—", medication: rMed || "—", dosage: rDose || "—",
-      date: new Date().toISOString().split("T")[0],
-    }]);
-    setRDiag(""); setRSymp(""); setRMed(""); setRDose("");
-    showToast("Record Created", `Medical record ${id} saved for ${patientName}`);
+    
+    try {
+      const patientId = rPatient || (patients[0]?.id || "P001");
+      const doctorId = rDoctor || (doctors[0]?.id || "D001");
+      const generatedId = `R${String(records.length + 1).padStart(3, "0")}`;
+      
+      // Setup prescriptions if provided
+      const prescriptions = rMed && rDose ? [{ medication_name: rMed, dosage: rDose }] : [];
+      
+      const res = await apiFetch("/records/", {
+        method: "POST",
+        body: JSON.stringify({
+          record_id: generatedId,
+          patient_id: patientId,
+          doctor_id: doctorId,
+          diagnosis: rDiag.trim(),
+          symptoms: rSymp || undefined,
+          prescriptions: prescriptions
+        })
+      });
+      
+      const pName = patients.find((p) => p.id === patientId)?.name || "Unknown";
+      const dName = doctors.find((d) => d.id === doctorId)?.name || "Unknown";
+      
+      setRecords((prev) => [...prev, {
+        id: res.record_id, patientName: pName, doctorName: dName, diagnosis: res.diagnosis || "—",
+        symptoms: res.symptoms || "—", medication: rMed || "—", dosage: rDose || "—",
+        date: new Date().toISOString().split("T")[0],
+      }]);
+      setRDiag(""); setRSymp(""); setRMed(""); setRDose("");
+      showToast("Record Created", `Medical record created for ${pName}`);
+    } catch (err: any) {
+      showToast("Error", err.message || "Failed to add record", "var(--color-coral)");
+    }
   }
 
   function runQuery() {
