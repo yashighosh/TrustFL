@@ -1,29 +1,18 @@
 "use client";
 
 import { useState } from "react";
-
-/* ──────── Pre-registered hospitals (for login demo) ──────── */
-const existingHospitals = [
-  { id: "H001", name: "CityCare Hospital", location: "Chennai", type: "Private", email: "admin@citycare.in", phone: "+91-44-28001234" },
-  { id: "H002", name: "Green Valley Hospital", location: "Bangalore", type: "Private", email: "admin@greenvalley.in", phone: "+91-80-25009999" },
-  { id: "H003", name: "National Medical Center", location: "Delhi", type: "Government", email: "admin@nmc.gov.in", phone: "+91-11-23456789" },
-];
+import { apiFetch } from "@/app/lib/api";
+import { useHospital } from "@/app/context/HospitalContext";
 
 interface AuthPageProps {
-  onRegister: (hospital: {
-    id: string;
-    name: string;
-    location: string;
-    type: string;
-    email: string;
-    phone: string;
-    registeredAt: string;
-  }) => void;
   onBack: () => void;
+  onHospitalEntry: () => void;
   onSuperAdmin?: () => void;
 }
 
-export default function AuthPage({ onRegister, onBack, onSuperAdmin }: AuthPageProps) {
+export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: AuthPageProps) {
+  const { setHospital, setIsAdmin } = useHospital();
+  
   const [mode, setMode] = useState<"choice" | "register" | "login" | "superadmin">("choice");
 
   /* Registration form */
@@ -46,7 +35,7 @@ export default function AuthPage({ onRegister, onBack, onSuperAdmin }: AuthPageP
   const inputClass =
     "w-full px-4 py-3 rounded-xl bg-surface border border-border-custom outline-none transition-all text-sm focus:ring-1 focus:border-primary focus:ring-primary placeholder:text-muted-2";
 
-  function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -56,52 +45,100 @@ export default function AuthPage({ onRegister, onBack, onSuperAdmin }: AuthPageP
     if (regPassword !== regConfirm) { setError("Passwords do not match"); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      const id = `H00${existingHospitals.length + 1 + Math.floor(Math.random() * 10)}`;
-      onRegister({
-        id,
-        name: regName.trim(),
-        location: regLocation.trim() || "Unknown",
-        type: regType,
-        email: regEmail.trim(),
-        phone: regPhone.trim() || "—",
-        registeredAt: new Date().toISOString().split("T")[0],
+    try {
+      const generatedId = `H00${Math.floor(Math.random() * 100)}`; // Basic ID gen for now
+      const res = await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          hospital_id: generatedId,
+          hospital_name: regName.trim(),
+          hospital_location: regLocation.trim() || undefined,
+          hospital_type: regType,
+          contact_email: regEmail.trim(),
+          contact_phone: regPhone.trim() || undefined,
+          password: regPassword
+        })
       });
+
+      localStorage.setItem("trustfl_token", res.access_token);
+      localStorage.setItem("trustfl_role", res.role);
+
+      setHospital({
+        id: res.hospital.hospital_id,
+        name: res.hospital.hospital_name,
+        location: res.hospital.hospital_location || "Unknown",
+        type: res.hospital.hospital_type || "Unknown",
+        email: res.hospital.contact_email,
+        phone: res.hospital.contact_phone || "—",
+        registeredAt: new Date(res.hospital.created_at).toISOString().split("T")[0],
+      });
+      onHospitalEntry();
+    } catch (err: any) {
+      setError(err.message || "Registration failed");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
     if (!loginPassword) { setError("Password is required"); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      const found = existingHospitals.find((h) => h.id === loginHosp);
-      if (found) {
-        onRegister({
-          ...found,
-          registeredAt: "2026-01-15",
-        });
-      }
+    try {
+      const res = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          hospital_id: loginHosp,
+          password: loginPassword
+        })
+      });
+
+      localStorage.setItem("trustfl_token", res.access_token);
+      localStorage.setItem("trustfl_role", res.role);
+
+      setHospital({
+        id: res.hospital.hospital_id,
+        name: res.hospital.hospital_name,
+        location: res.hospital.hospital_location || "Unknown",
+        type: res.hospital.hospital_type || "Unknown",
+        email: res.hospital.contact_email,
+        phone: res.hospital.contact_phone || "—",
+        registeredAt: new Date(res.hospital.created_at).toISOString().split("T")[0],
+      });
+      onHospitalEntry();
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   }
 
-  function handleSuperAdminLogin(e: React.FormEvent) {
+  async function handleSuperAdminLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
     if (!adminKey) { setError("Admin Key is required"); return; }
-    if (adminKey !== "admin123") { setError("Invalid Super Admin Key"); return; }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await apiFetch("/auth/admin-login", {
+        method: "POST",
+        body: JSON.stringify({ admin_key: adminKey })
+      });
+
+      localStorage.setItem("trustfl_token", res.access_token);
+      localStorage.setItem("trustfl_role", res.role);
+
+      setIsAdmin(true);
       onSuperAdmin?.();
+    } catch (err: any) {
+      setError(err.message || "Admin login failed");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   }
 
   /* ── Choice Screen ── */
@@ -376,12 +413,15 @@ export default function AuthPage({ onRegister, onBack, onSuperAdmin }: AuthPageP
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-mono font-semibold text-muted uppercase tracking-wider mb-1.5">Select Hospital</label>
-            <select value={loginHosp} onChange={(e) => setLoginHosp(e.target.value)} className={inputClass}>
-              {existingHospitals.map((h) => (
-                <option key={h.id} value={h.id}>{h.id} — {h.name}</option>
-              ))}
-            </select>
+            <label className="block text-xs font-mono font-semibold text-muted uppercase tracking-wider mb-1.5">Hospital ID</label>
+            <input 
+              type="text" 
+              value={loginHosp} 
+              onChange={(e) => setLoginHosp(e.target.value)} 
+              className={inputClass} 
+              placeholder="e.g. H001" 
+              required 
+            />
           </div>
 
           <div>
