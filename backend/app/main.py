@@ -15,6 +15,7 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://trustfl.vercel.app"
 ]
 frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
