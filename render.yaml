@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: trustfl-backend
+    env: python
+    buildCommand: "./backend/build.sh"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trustfl-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440
+      - key: ADMIN_SECRET_KEY
+        value: admin123
+        
+databases:
+  - name: trustfl-db
+    databaseName: trustfl_hospital_db
+    user: admin
