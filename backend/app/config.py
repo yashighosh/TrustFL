@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
     SECRET_KEY: str = os.getenv("SECRET_KEY", "trustfl-super-secret-jwt-key-2026")
-    ADMIN_SECRET_KEY: str = os.getenv("ADMIN_SECRET_KEY", "admin123")
+    ADMIN_SECRET_KEY: str = os.getenv("ADMIN_SECRET_KEY", "yashi911")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 

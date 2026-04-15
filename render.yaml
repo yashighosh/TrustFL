@@ -18,7 +18,7 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 1440
       - key: ADMIN_SECRET_KEY
-        value: admin123
+        value: yashi911
         
 databases:
   - name: trustfl-db

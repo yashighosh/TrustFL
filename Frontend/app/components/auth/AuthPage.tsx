@@ -373,9 +373,7 @@ export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: Auth
               </button>
             </div>
           </form>
-          <div className="mt-6 text-center text-xs text-muted font-mono">
-            Demo Key: <span className="text-text-primary font-bold">admin123</span>
-          </div>
+          {/* Demo key hidden for security */}
         </div>
       </div>
     );
