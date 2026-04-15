@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ToastProvider } from "@/app/context/ToastContext";
+import { useHospital } from "@/app/context/HospitalContext";
 import Toast from "@/app/components/ui/Toast";
 import NetworkOverview from "@/app/components/admin/NetworkOverview";
 import BlockchainPage from "@/app/components/blockchain/BlockchainPage";
@@ -11,6 +12,7 @@ import Footer from "@/app/components/layout/Footer";
 
 export default function AdminPage() {
   const router = useRouter();
+  const { logout } = useHospital();
   const [activeTab, setActiveTab] = useState(0);
 
   const tabs = [
@@ -59,7 +61,10 @@ export default function AdminPage() {
             <span>3 nodes online</span>
           </div>
           <button
-            onClick={() => router.push("/auth")}
+            onClick={() => {
+              logout();
+              router.push("/auth");
+            }}
             className="px-3.5 py-1.5 rounded-lg font-mono text-[10px] cursor-pointer bg-transparent text-muted border border-border-2 tracking-wider transition-all hover:bg-surface-2 hover:text-text-primary"
           >
             Sign Out
