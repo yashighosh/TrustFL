@@ -19,7 +19,26 @@ services:
         value: 1440
       - key: ADMIN_SECRET_KEY
         value: admin123
+      - key: FRONTEND_URL
+        fromService:
+          name: trustfl-frontend
+          type: web
+          property: host
         
+  - type: web
+    name: trustfl-frontend
+    env: node
+    buildCommand: "cd Frontend && npm install && npm run build"
+    startCommand: "cd Frontend && npm start -- -p $PORT"
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: trustfl-backend
+          type: web
+          property: host
+      - key: NODE_VERSION
+        value: 18.0.0
+
 databases:
   - name: trustfl-db
     databaseName: trustfl_hospital_db
