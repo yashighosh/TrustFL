@@ -5,6 +5,7 @@ import { useToast } from "@/app/context/ToastContext";
 import NetworkCanvas from "./NetworkCanvas";
 import AccuracyChart, { type AccuracyChartHandle } from "./AccuracyChart";
 import Leaderboard from "./Leaderboard";
+import { apiFetch } from "@/app/lib/api";
 
 /* ──────── Types ──────── */
 interface LogEntry {
@@ -65,8 +66,8 @@ export default function FLPage() {
   const [cardGlow, setCardGlow] = useState(false);
 
   const [logs, setLogs] = useState<LogEntry[]>([
-    { id: 1, ts: "00:00", msg: "TrustFL initialised. PyTorch backend ready.", type: "sys" },
-    { id: 2, ts: "00:00", msg: "3 hospital nodes connected to FL server.", type: "info" },
+    { id: 1, ts: "00:00", msg: "TrustFL initialised. Connected to DB backend.", type: "sys" },
+    { id: 2, ts: "00:00", msg: "3 hospital nodes ready for federated training.", type: "info" },
   ]);
   const logIdRef = useRef(3);
 
@@ -98,64 +99,70 @@ export default function FLPage() {
     addLog(`── Round ${currentRound} started ──`, "sys");
     setCardGlow(true);
 
-    await sleep(350);
+    try {
+      addLog("Sending config to backend...", "info");
+      const res = await apiFetch("/fl/run-round", {
+        method: "POST",
+        body: JSON.stringify({
+          model_name: modelName,
+          round_number: currentRound,
+          epochs: flEpochs,
+          lr: flLr / 1000
+        }),
+      });
 
-    // Local training
-    const la = (62 + currentRound * 2.8 + (Math.random() - 0.5) * 3).toFixed(1);
-    const lb = (60 + currentRound * 2.5 + (Math.random() - 0.5) * 3).toFixed(1);
-    const lc = (63 + currentRound * 3.0 + (Math.random() - 0.5) * 3).toFixed(1);
-    const lossa = (0.68 - currentRound * 0.048 + (Math.random() - 0.5) * 0.02).toFixed(4);
-    const lossb = (0.72 - currentRound * 0.05 + (Math.random() - 0.5) * 0.02).toFixed(4);
-    const lossc = (0.65 - currentRound * 0.045 + (Math.random() - 0.5) * 0.02).toFixed(4);
+      if (res.status === "success") {
+        const hm = res.hospital_metrics;
+        
+        await sleep(350);
+        addLog(`H001 — local training complete. acc=${hm.a.acc} loss=${hm.a.loss}`, "ok");
+        await sleep(200);
+        addLog(`H002 — local training complete. acc=${hm.b.acc} loss=${hm.b.loss}`, "ok");
+        await sleep(200);
+        addLog(`H003 — local training complete. acc=${hm.c.acc} loss=${hm.c.loss}`, "ok");
 
-    addLog(`H001 — local training complete. acc=${la}% loss=${lossa}`, "ok");
-    await sleep(200);
-    addLog(`H002 — local training complete. acc=${lb}% loss=${lossb}`, "ok");
-    await sleep(200);
-    addLog(`H003 — local training complete. acc=${lc}% loss=${lossc}`, "ok");
+        setMetrics({
+          a: { acc: hm.a.acc, loss: hm.a.loss, score: hm.a.score, bar: hm.a.bar },
+          b: { acc: hm.b.acc, loss: hm.b.loss, score: hm.b.score, bar: hm.b.bar },
+          c: { acc: hm.c.acc, loss: hm.c.loss, score: hm.c.score, bar: hm.c.bar },
+        });
 
-    // Update cards
-    const sa = (0.3 + Math.random() * 0.15).toFixed(2);
-    const sb = (0.28 + Math.random() * 0.12).toFixed(2);
-    const sc = (0.32 + Math.random() * 0.18).toFixed(2);
+        await sleep(400);
+        addLog("FL Server — FedAvg aggregating weight tensors...", "warn");
 
-    setMetrics({
-      a: { acc: la + "%", loss: lossa, score: sa, bar: Math.min(Number(la), 100) },
-      b: { acc: lb + "%", loss: lossb, score: sb, bar: Math.min(Number(lb), 100) },
-      c: { acc: lc + "%", loss: lossc, score: sc, bar: Math.min(Number(lc), 100) },
-    });
+        await sleep(500);
+        addLog(`Global model updated. accuracy=${res.global_acc}%`, "ok");
 
-    await sleep(400);
-    addLog("FL Server — FedAvg aggregating 3 weight tensors...", "warn");
+        // Blockchain
+        await sleep(200);
+        addLog(`Blockchain — hashing R${currentRound} updates (3 blocks)...`, "chain");
+        await sleep(300);
+        addLog(`Blockchain — blocks confirmed. Chain height: ${4 + currentRound * 3}`, "chain");
 
-    const gAcc = ((parseFloat(la) + parseFloat(lb) + parseFloat(lc)) / 3).toFixed(1);
-    await sleep(500);
-    addLog(`Global model updated. accuracy=${gAcc}%`, "ok");
+        // Chart update
+        chartRef.current?.addData(`R${currentRound}`, parseFloat(res.global_acc), hm.a.bar, hm.b.bar, hm.c.bar);
 
-    // Blockchain
-    await sleep(200);
-    addLog(`Blockchain — hashing R${currentRound} updates (3 blocks)...`, "chain");
-    await sleep(300);
-    addLog(`Blockchain — blocks confirmed. Chain height: ${4 + currentRound * 3}`, "chain");
+        // Update global
+        setGlobalAcc(res.global_acc);
+        const prog = (currentRound / flRounds) * 100;
+        setProgress(prog);
+      }
+    } catch (err: any) {
+      addLog(`Error: ${err.message}`, "warn");
+      flRoundRef.current--; // rollback logic
+    }
 
-    // Chart update
-    chartRef.current?.addData(`R${currentRound}`, parseFloat(gAcc), parseFloat(la), parseFloat(lb), parseFloat(lc));
-
-    // Update global
-    setGlobalAcc(gAcc);
-    const prog = (currentRound / flRounds) * 100;
-    setProgress(prog);
     setCardGlow(false);
 
     if (currentRound >= flRounds) {
-      addLog(`Training complete! Final accuracy: ${gAcc}%`, "ok");
+      addLog(`Training complete!`, "ok");
       setRoundDisplay("complete ✓");
-      showToast("Training Complete", `Global model reached ${gAcc}% accuracy`);
+      showToast("Training Complete", `FL Process Finalised`);
     }
 
     flRunningRef.current = false;
     setFlRunning(false);
-  }, [flRounds, addLog, showToast]);
+  }, [flRounds, addLog, showToast, modelName, flEpochs, flLr]);
 
   /* ── Run All ── */
   const runAllFL = useCallback(async () => {
