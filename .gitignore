@@ -19,3 +19,5 @@
 
 # Also keep .gitignore to track it
 !.gitignore
+!README.md
+!LICENSE
