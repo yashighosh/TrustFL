@@ -2,6 +2,9 @@
 # exit on error
 set -o errexit
 
+# Navigate to backend directory (needed when called from repo root on Render)
+cd "$(dirname "$0")"
+
 pip install --upgrade pip
 pip install -r requirements.txt
 
