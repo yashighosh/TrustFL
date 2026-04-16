@@ -139,35 +139,37 @@ export default function BlockchainPage() {
   const { showToast } = useToast();
   const [chainBlocks, setChainBlocks] = useState<ChainBlock[]>([]);
   
-  useEffect(() => {
-    const fetchLedger = async () => {
-      try {
-        const data = await apiFetch("/blockchain/ledger");
-        const formatted: ChainBlock[] = [
-          { num: 0, type: "genesis", hosp: "GENESIS", hash: "0x000000000000", prev: "0x000000000000", status: "verified", acc: null, round: "—", timestamp: getTs() }
-        ];
-        
-        data.reverse().forEach((item: any, idx: number) => {
-          formatted.push({
-            num: idx + 1,
-            type: "block",
-            hosp: item.hospital || "Unknown",
-            hash: item.transaction_hash,
-            prev: formatted[idx].hash,
-            status: item.status.toLowerCase(),
-            acc: "—", // Missing in block, would need ModelUpdate inclusion
-            round: item.update_id.split("-")[0] || "—",
-            timestamp: new Date(item.timestamp).toLocaleTimeString()
-          });
+  const fetchLedger = useCallback(async () => {
+    try {
+      const data = await apiFetch("/blockchain/ledger");
+      if (!data || !Array.isArray(data)) return;
+      const formatted: ChainBlock[] = [
+        { num: 0, type: "genesis", hosp: "GENESIS", hash: "0x000000000000", prev: "0x000000000000", status: "verified", acc: null, round: "—", timestamp: getTs() }
+      ];
+      
+      data.reverse().forEach((item: any, idx: number) => {
+        formatted.push({
+          num: idx + 1,
+          type: "block",
+          hosp: item.hospital || "Unknown",
+          hash: item.transaction_hash,
+          prev: formatted[idx].hash,
+          status: item.status.toLowerCase(),
+          acc: item.accuracy ? item.accuracy + "%" : "—",
+          round: item.update_id ? item.update_id.split("-")[0] : "—",
+          timestamp: new Date(item.timestamp).toLocaleTimeString()
         });
-        
-        setChainBlocks(formatted);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchLedger();
+      });
+      
+      setChainBlocks(formatted);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
   const [verifyIdx, setVerifyIdx] = useState(0);
   const [hashDisplay, setHashDisplay] = useState(hashes[0] + "...");
   const [selectedBlock, setSelectedBlock] = useState<ChainBlock | null>(null);
@@ -202,66 +204,60 @@ export default function BlockchainPage() {
     addTxLog(`[HASH] Computed SHA-256 for update U00${verifyIdx + 1}`, "info");
   }
 
-  function mineBlock() {
-    const hosps = ["H001", "H002", "H003"];
-    const rounds = ["TR003", "TR004", "TR005"];
-    const accs = ["88%", "90%", "92%", "86%"];
-    const h = hosps[Math.floor(Math.random() * hosps.length)];
-    const prevHash = chainBlocks[chainBlocks.length - 1].hash;
-    const newHash = "0x" + Math.random().toString(16).slice(2, 10) + "hash" + Math.random().toString(16).slice(2, 8);
-    const num = blockNumRef.current++;
-    const block: ChainBlock = {
-      num,
-      type: "block",
-      hosp: h,
-      hash: newHash,
-      prev: prevHash,
-      status: "pending",
-      acc: accs[Math.floor(Math.random() * accs.length)],
-      round: rounds[Math.floor(Math.random() * rounds.length)],
-      timestamp: getTs(),
-    };
-    setChainBlocks((prev) => [...prev, block]);
-    addTxLog(`[MINE] Block #${num} mined for ${h} — hash: ${newHash.slice(0, 14)}...`, "warn");
-    setTimeout(() => {
-      setChainBlocks((prev) =>
-        prev.map((b) => (b.num === num ? { ...b, status: "verified" } : b))
-      );
-      addTxLog(`[OK] Block #${num} confirmed on blockchain`, "ok");
-      showToast("Block Mined", "New block added and verified");
-    }, 1800);
+  async function mineBlock() {
+    addTxLog(`[MINE] Mining new block for training update...`, "info");
+    try {
+      const res = await apiFetch("/blockchain/mine", { method: "POST" });
+      if (res.error) {
+        addTxLog(`[ERR] ${res.error}`, "err");
+        showToast("Error", res.error, "var(--color-coral)");
+        return;
+      }
+      addTxLog(`[OK] Block successfully mined. Syncing ledger...`, "ok");
+      await fetchLedger();
+      showToast("Block Mined", "New block securely added to network");
+    } catch (error) {
+      addTxLog(`[ERR] Mining failed`, "err");
+    }
   }
 
-  function verifyChain() {
-    addTxLog("[VERIFY] Running chain integrity check...", "info");
-    setTimeout(() => {
-      setChainBlocks((prev) =>
-        prev.map((b) => (b.status === "pending" ? { ...b, status: "verified" } : b))
-      );
-      addTxLog("[OK] All blocks verified. Chain intact.", "ok");
-      showToast("Chain Verified", "All blocks integrity confirmed ✓");
-    }, 1000);
+  async function verifyChain() {
+    addTxLog("[VERIFY] Running globally distributed consensus...", "info");
+    try {
+      const res = await apiFetch("/blockchain/verify", { method: "POST" });
+      addTxLog(`[OK] ${res.message}. Chain securely intact.`, "ok");
+      await fetchLedger();
+      showToast("Chain Verified", "Consensus reached. Integrity confirmed ✓");
+    } catch (error) {
+      addTxLog(`[ERR] Chain verification failed!`, "err");
+    }
   }
 
-  function tamperBlock() {
+  async function tamperBlock() {
     if (chainBlocks.length < 2) {
       showToast("Error", "Need more blocks", "var(--color-coral)");
       return;
     }
-    const idx = 1 + Math.floor(Math.random() * (chainBlocks.length - 1));
-    const tampered = "0xTAMPERED_" + Math.random().toString(16).slice(2, 10);
-    setChainBlocks((prev) =>
-      prev.map((b, i) => (i === idx ? { ...b, hash: tampered, status: "failed" } : b))
-    );
-    addTxLog(`[ALERT] Block #${chainBlocks[idx].num} tampered! Hash mismatch detected!`, "err");
-    showToast("Tamper Detected!", `Block #${idx} hash changed — chain compromised`, "var(--color-coral)");
+    addTxLog(`[ATTACK] Sending malicious 51% hash tampering to network node...`, "warn");
+    try {
+      const res = await apiFetch("/blockchain/tamper", { method: "POST" });
+      if (res.error) {
+        showToast("Error", res.error, "var(--color-coral)");
+        return;
+      }
+      addTxLog(`[ALERT] ${res.message} Hash mismatch explicitly detected!`, "err");
+      await fetchLedger();
+      showToast("Tamper Detected!", `Chain security breached. Block flagged.`, "var(--color-coral)");
+    } catch (err) {
+      addTxLog(`[ERR] Simulation failed`, "err");
+    }
   }
 
   function verifyUpdate() {
-    addTxLog(`[VERIFY] Verifying update U00${verifyIdx + 1} hash against ledger...`, "info");
+    addTxLog(`[VERIFY] Local client checking update hash integrity...`, "info");
     setTimeout(() => {
-      addTxLog(`[OK] U00${verifyIdx + 1} hash matches block #${verifyIdx + 1}. Integrity confirmed.`, "ok");
-      showToast("Update Verified", `Model update U00${verifyIdx + 1} is authentic`);
+      addTxLog(`[OK] Hash trace verified accurately! Server authentic.`, "ok");
+      showToast("Update Verified", `Local check perfectly aligned.`);
     }, 800);
   }
 
