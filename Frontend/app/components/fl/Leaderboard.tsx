@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { apiFetch } from "@/app/lib/api";
 
 /* ──────── Types ──────── */
 interface HospitalRank {
@@ -15,13 +16,6 @@ interface HospitalRank {
   color: string;
 }
 
-/* ──────── Mock Data ──────── */
-const leaderboardData: HospitalRank[] = [
-  { id: "H003", name: "National Medical Center", accuracy: 91.2, rounds: 10, updates: 12, reputation: 0.85, trend: "up", tier: "gold", color: "var(--color-neon-blue)" },
-  { id: "H001", name: "CityCare Hospital", accuracy: 89.3, rounds: 10, updates: 12, reputation: 0.80, trend: "up", tier: "silver", color: "var(--color-primary)" },
-  { id: "H002", name: "Green Valley Hospital", accuracy: 87.1, rounds: 10, updates: 12, reputation: 0.75, trend: "stable", tier: "bronze", color: "var(--color-amber)" },
-];
-
 const tierConfig = {
   gold: { emoji: "🥇", label: "GOLD", bg: "bg-amber-light", text: "text-amber", border: "border-amber/20" },
   silver: { emoji: "🥈", label: "SILVER", bg: "bg-surface-3", text: "text-muted", border: "border-border-2" },
@@ -34,6 +28,33 @@ const trendColors = { up: "text-neon-green", down: "text-coral", stable: "text-m
 /* ══════════════════════════ LEADERBOARD ══════════════════════════ */
 export default function Leaderboard() {
   const [sortBy, setSortBy] = useState<"accuracy" | "reputation" | "updates">("accuracy");
+  const [leaderboardData, setLeaderboardData] = useState<HospitalRank[]>([]);
+
+  useEffect(() => {
+    async function fetchLeaderboard() {
+      try {
+        const data = await apiFetch("/fl/leaderboard");
+        if (data && Array.isArray(data)) {
+          const colors = ["var(--color-neon-blue)", "var(--color-primary)", "var(--color-amber)"];
+          const formatted: HospitalRank[] = data.map((item: any, i: number) => ({
+            id: item.hospital_id,
+            name: item.hospital_name,
+            accuracy: item.accuracy,
+            rounds: 10, // mock or you can fetch it
+            updates: item.updates,
+            reputation: item.reputation_score,
+            trend: "up", // dynamic?
+            tier: i === 0 ? "gold" : i === 1 ? "silver" : "bronze",
+            color: colors[i % colors.length],
+          }));
+          setLeaderboardData(formatted);
+        }
+      } catch (err) {
+        console.error("Failed to fetch leaderboard:", err);
+      }
+    }
+    fetchLeaderboard();
+  }, []);
 
   const sorted = useMemo(() => {
     return [...leaderboardData].sort((a, b) => {
@@ -41,7 +62,7 @@ export default function Leaderboard() {
       if (sortBy === "reputation") return b.reputation - a.reputation;
       return b.updates - a.updates;
     });
-  }, [sortBy]);
+  }, [sortBy, leaderboardData]);
 
   return (
     <div className="bg-surface border border-border-custom rounded-2xl overflow-hidden">
@@ -94,7 +115,7 @@ export default function Leaderboard() {
                     </span>
                   </div>
                   <div className="font-mono text-[10px] text-muted">
-                    {hosp.id} · {hosp.rounds} rounds · {hosp.updates} updates
+                    {hosp.id} · {hosp.rounds}+ rounds · {hosp.updates} updates
                   </div>
                 </div>
 
