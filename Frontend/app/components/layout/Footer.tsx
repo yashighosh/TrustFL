@@ -14,7 +14,7 @@ export default function Footer() {
           </div>
           <div className="text-sm text-muted">
             Built with <span className="text-coral">♥</span> by{" "}
-            <span className="font-semibold text-text-primary">Yashi & Abhiraj</span>
+            <span className="font-semibold text-text-primary">Yashi</span>
           </div>
         </div>
       </div>
