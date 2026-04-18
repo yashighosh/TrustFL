@@ -114,4 +114,3 @@ Your system is now completely connected. Navigate to `http://localhost:3000` to 
 ## 👨‍💻 Author
 
 Built with ♥ by **Yashi**. 
-*Conceptualised as a DBMS Engineering Mini Project — SRM IST*
