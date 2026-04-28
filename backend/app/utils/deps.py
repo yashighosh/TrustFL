@@ -33,7 +33,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 def get_current_hospital(token_data: TokenData = Depends(get_current_user), db: Session = Depends(get_db)):
     if token_data.role == "admin":
-        return None # Admin doesn't have a hospital context
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admins do not have a hospital context. Use the admin panel."
+        )
         
     hospital = db.query(Hospital).filter(Hospital.hospital_id == token_data.id).first()
     if hospital is None:

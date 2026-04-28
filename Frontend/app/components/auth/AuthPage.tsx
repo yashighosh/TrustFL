@@ -13,7 +13,8 @@ interface AuthPageProps {
 export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: AuthPageProps) {
   const { setHospital, setIsAdmin } = useHospital();
   
-  const [mode, setMode] = useState<"choice" | "register" | "login" | "superadmin">("choice");
+  const [mode, setMode] = useState<"choice" | "register" | "login" | "superadmin" | "success">("choice");
+  const [registeredHospitalId, setRegisteredHospitalId] = useState("");
 
   /* Registration form */
   const [regName, setRegName] = useState("");
@@ -25,7 +26,7 @@ export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: Auth
   const [regConfirm, setRegConfirm] = useState("");
 
   /* Login form */
-  const [loginHosp, setLoginHosp] = useState("H001");
+  const [loginHosp, setLoginHosp] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -46,11 +47,9 @@ export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: Auth
 
     setLoading(true);
     try {
-      const generatedId = `H00${Math.floor(Math.random() * 100)}`; // Basic ID gen for now
       const res = await apiFetch("/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          hospital_id: generatedId,
           hospital_name: regName.trim(),
           hospital_location: regLocation.trim() || undefined,
           hospital_type: regType,
@@ -72,7 +71,9 @@ export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: Auth
         phone: res.hospital.contact_phone || "—",
         registeredAt: new Date(res.hospital.created_at).toISOString().split("T")[0],
       });
-      onHospitalEntry();
+      // Show success screen with the generated Hospital ID before entering
+      setRegisteredHospitalId(res.hospital.hospital_id);
+      setMode("success");
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -139,6 +140,37 @@ export default function AuthPage({ onBack, onHospitalEntry, onSuperAdmin }: Auth
     } finally {
       setLoading(false);
     }
+  }
+
+  /* ── Registration Success Screen ── */
+  if (mode === "success") {
+    return (
+      <div className="min-h-screen landing-gradient flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute top-20 right-20 w-72 h-72 rounded-full bg-neon-green/5 blur-3xl opacity-60" />
+        <div className="glass-card rounded-[2rem] w-full max-w-md p-10 relative z-10 text-center" style={{ animation: "slideUp 0.5s ease" }}>
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-green-light border border-neon-green/20 flex items-center justify-center text-3xl shadow-sm">
+              ✅
+            </div>
+          </div>
+          <h2 className="text-3xl font-extrabold text-text-primary tracking-tight mb-2">Hospital Registered!</h2>
+          <p className="text-sm text-muted mb-6">Your hospital has been added to the TrustFL network. Save your Hospital ID — you'll need it to log in.</p>
+
+          <div className="bg-surface-2 border border-border-2 rounded-xl px-6 py-4 mb-6">
+            <div className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Your Hospital ID</div>
+            <div className="font-mono text-2xl font-extrabold text-primary tracking-wider">{registeredHospitalId}</div>
+            <div className="font-mono text-[10px] text-muted mt-2">⚠ Save this ID — you need it to log in</div>
+          </div>
+
+          <button
+            onClick={onHospitalEntry}
+            className="w-full py-3.5 rounded-xl text-white font-bold font-mono tracking-wider transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 bg-primary hover:bg-primary-dark"
+          >
+            Enter Dashboard →
+          </button>
+        </div>
+      </div>
+    );
   }
 
   /* ── Choice Screen ── */

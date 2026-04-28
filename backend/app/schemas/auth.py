@@ -12,7 +12,7 @@ class HospitalBase(BaseModel):
 
 
 class HospitalCreate(HospitalBase):
-    hospital_id: str
+    hospital_id: str = ""  # Ignored — ID is generated server-side
     password: str
 
 

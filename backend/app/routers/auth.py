@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -13,19 +14,16 @@ settings = get_settings()
 
 @router.post("/register", response_model=Token)
 def register_hospital(hospital_in: HospitalCreate, db: Session = Depends(get_db)):
-    # Check if hospital already exists
-    hospital = db.query(Hospital).filter(
-        (Hospital.hospital_id == hospital_in.hospital_id) | 
-        (Hospital.contact_email == hospital_in.contact_email)
-    ).first()
-    
-    if hospital:
-        raise HTTPException(status_code=400, detail="Hospital ID or Email already registered")
+    # Only check email uniqueness — ID is now generated server-side
+    if db.query(Hospital).filter(Hospital.contact_email == hospital_in.contact_email).first():
+        raise HTTPException(status_code=400, detail="A hospital with this email is already registered")
         
+    # Generate a unique hospital ID server-side
+    generated_id = f"H-{uuid.uuid4().hex[:8].upper()}"
     hashed_password = get_password_hash(hospital_in.password)
     
     db_hospital = Hospital(
-        hospital_id=hospital_in.hospital_id,
+        hospital_id=generated_id,
         hospital_name=hospital_in.hospital_name,
         hospital_location=hospital_in.hospital_location,
         hospital_type=hospital_in.hospital_type,
