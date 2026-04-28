@@ -36,11 +36,11 @@ def create_record(
     if not patient or patient.hospital_id != current_hospital.hospital_id:
         raise HTTPException(status_code=403, detail="Patient not found or unauthorized")
 
-    if db.query(MedicalRecord).filter(MedicalRecord.record_id == record_in.record_id).first():
-        raise HTTPException(status_code=400, detail="Record ID already exists")
+    # Generate a globally unique ID server-side to avoid collisions across hospitals
+    generated_record_id = f"R-{uuid.uuid4().hex[:8].upper()}"
 
     db_record = MedicalRecord(
-        record_id=record_in.record_id,
+        record_id=generated_record_id,
         patient_id=record_in.patient_id,
         doctor_id=record_in.doctor_id,
         diagnosis=record_in.diagnosis,

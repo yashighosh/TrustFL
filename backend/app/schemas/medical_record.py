@@ -22,7 +22,7 @@ class MedicalRecordBase(BaseModel):
 
 
 class MedicalRecordCreate(MedicalRecordBase):
-    record_id: str
+    record_id: str = ""  # Ignored — ID is generated server-side
     prescriptions: Optional[List[PrescriptionBase]] = []
 
 

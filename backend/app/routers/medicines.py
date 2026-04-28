@@ -1,3 +1,4 @@
+import uuid
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -27,11 +28,11 @@ def create_medicine(
     current_hospital: Hospital = Depends(get_current_hospital)
 ):
     """Register a new medicine for the hospital"""
-    if db.query(Medicine).filter(Medicine.medicine_id == medicine_in.medicine_id).first():
-        raise HTTPException(status_code=400, detail="Medicine ID already exists")
+    # Generate a globally unique ID server-side to avoid collisions across hospitals
+    generated_id = f"M-{uuid.uuid4().hex[:8].upper()}"
 
     db_medicine = Medicine(
-        medicine_id=medicine_in.medicine_id,
+        medicine_id=generated_id,
         hospital_id=current_hospital.hospital_id,
         medicine_name=medicine_in.medicine_name,
         category=medicine_in.category,

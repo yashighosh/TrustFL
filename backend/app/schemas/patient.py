@@ -12,7 +12,7 @@ class PatientBase(BaseModel):
 
 
 class PatientCreate(PatientBase):
-    patient_id: str
+    patient_id: str = ""  # Ignored — ID is generated server-side
 
 
 class PatientOut(PatientBase):

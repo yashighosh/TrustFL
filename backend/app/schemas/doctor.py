@@ -14,6 +14,11 @@ class DoctorCreate(DoctorBase):
     doctor_id: str
 
 
+# Used for POST requests — ID is now generated server-side
+class DoctorCreateIn(DoctorBase):
+    pass
+
+
 class DoctorOut(DoctorBase):
     doctor_id: str
     hospital_id: str

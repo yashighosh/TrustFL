@@ -191,11 +191,9 @@ export default function DatabasePage() {
     if (!dName.trim()) { showToast("Error", "Doctor name is required", "var(--color-coral)"); return; }
     
     try {
-      const generatedId = `D${String(doctors.length + 1).padStart(3, "0")}`;
       const res = await apiFetch("/doctors/", {
         method: "POST",
         body: JSON.stringify({
-          doctor_id: generatedId,
           doctor_name: dName.trim(),
           specialization: dSpec,
           experience_years: parseInt(dExp) || 0,
@@ -220,11 +218,9 @@ export default function DatabasePage() {
     if (!pName.trim()) { showToast("Error", "Patient name is required", "var(--color-coral)"); return; }
     
     try {
-      const generatedId = `P${String(patients.length + 1).padStart(3, "0")}`;
       const res = await apiFetch("/patients/", {
         method: "POST",
         body: JSON.stringify({
-          patient_id: generatedId,
           patient_name: pName.trim(),
           gender: pGender,
           blood_group: pBlood,
@@ -249,11 +245,9 @@ export default function DatabasePage() {
     if (!mName.trim()) { showToast("Error", "Medicine name is required", "var(--color-coral)"); return; }
     
     try {
-      const generatedId = `M${String(medicines.length + 1).padStart(3, "0")}`;
       const res = await apiFetch("/medicines/", {
         method: "POST",
         body: JSON.stringify({
-          medicine_id: generatedId,
           medicine_name: mName.trim(),
           category: mCategory || "General",
           manufacturer: mManuf || "Unknown",
@@ -278,9 +272,8 @@ export default function DatabasePage() {
     if (!rDiag.trim()) { showToast("Error", "Diagnosis is required", "var(--color-coral)"); return; }
     
     try {
-      const patientId = rPatient || (patients[0]?.id || "P001");
-      const doctorId = rDoctor || (doctors[0]?.id || "D001");
-      const generatedId = `R${String(records.length + 1).padStart(3, "0")}`;
+      const patientId = rPatient || (patients[0]?.id || "");
+      const doctorId = rDoctor || (doctors[0]?.id || "");
       
       // Setup prescriptions if provided
       const prescriptions = rMed && rDose ? [{ medication_name: rMed, dosage: rDose }] : [];
@@ -288,7 +281,6 @@ export default function DatabasePage() {
       const res = await apiFetch("/records/", {
         method: "POST",
         body: JSON.stringify({
-          record_id: generatedId,
           patient_id: patientId,
           doctor_id: doctorId,
           diagnosis: rDiag.trim(),

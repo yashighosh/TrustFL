@@ -11,7 +11,7 @@ class MedicineBase(BaseModel):
 
 
 class MedicineCreate(MedicineBase):
-    medicine_id: str
+    medicine_id: str = ""  # Ignored — ID is generated server-side
 
 
 class MedicineOut(MedicineBase):
